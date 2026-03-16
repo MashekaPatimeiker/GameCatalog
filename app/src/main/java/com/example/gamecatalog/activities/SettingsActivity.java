@@ -2,16 +2,15 @@ package com.example.gamecatalog.activities;
 
 import android.content.Intent;
 import android.content.res.Configuration;
-import android.content.res.Resources;
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.Button;
 import android.widget.RadioGroup;
 import android.widget.Switch;
 
 import androidx.appcompat.app.AppCompatDelegate;
 
 import com.example.gamecatalog.R;
-import com.example.gamecatalog.utils.PreferencesHelper;
 
 import java.util.Locale;
 
@@ -25,7 +24,11 @@ public class SettingsActivity extends BaseActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
-
+        Button btnSortSettings = findViewById(R.id.btnSortSettings);
+        btnSortSettings.setOnClickListener(v -> {
+            Intent intent = new Intent(SettingsActivity.this, SortSettingsActivity.class);
+            startActivity(intent);
+        });
         Log.d(TAG, "onCreate: Current locale = " + Locale.getDefault().getLanguage());
 
         initViews();

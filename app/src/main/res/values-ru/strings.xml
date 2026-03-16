@@ -3,25 +3,48 @@
     <string name="loading">Загрузка...</string>
     <string name="add_game">Добавить игру</string>
     <string name="settings">Настройки</string>
+
     <string name="title">Название</string>
     <string name="genre">Жанр</string>
     <string name="release_date">Дата выхода</string>
     <string name="description">Описание</string>
+
     <string name="save">Сохранить</string>
     <string name="delete">Удалить</string>
+
     <string name="theme">Тема</string>
     <string name="dark_theme">Темная тема</string>
     <string name="language">Язык</string>
     <string name="english">Английский</string>
     <string name="russian">Русский</string>
+
     <string name="fill_required_fields">Заполните все обязательные поля</string>
     <string name="game_added">Игра успешно добавлена</string>
     <string name="game_updated">Игра успешно обновлена</string>
     <string name="game_deleted">Игра успешно удалена</string>
+    <string name="sort_settings">Настройки сортировки</string>
+    <string name="sort_by">Сортировать по</string>
+    <string name="sort_order">Порядок сортировки</string>
+    <string name="ascending">По возрастанию (А-Я)</string>
+    <string name="descending">По убыванию (Я-А)</string>
+    <string name="apply">Применить</string>
+    <string name="sort_settings_applied">Настройки сортировки применены</string>
+    <string name="select_sort_options">Выберите параметры сортировки</string>
     <string name="select_image">Выбрать изображение</string>
     <string name="choose_image_source">Выберите источник</string>
     <string name="take_photo">Сделать фото</string>
     <string name="choose_from_gallery">Выбрать из галереи</string>
     <string name="error_creating_file">Ошибка при создании файла</string>
     <string name="camera_permission_denied">Необходимо разрешение на использование камеры</string>
+
+    <string name="syncing">Синхронизация данных...</string>
+    <string name="no_internet_connection">Нет интернета. Показываем сохраненные данные.</string>
+    <string name="no_games">Игры не найдены</string>
+    <string name="search">Поиск</string>
+    <string name="sync">Синхр.</string>
+
+    <string name="delete_game_title">Удалить игру</string>
+    <string name="confirm_delete_message">Вы уверены, что хотите удалить эту игру?</string>
+    <string name="yes">Да</string>
+    <string name="no">Нет</string>
 </resources>

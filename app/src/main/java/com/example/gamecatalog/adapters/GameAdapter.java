@@ -5,25 +5,31 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
+
 import com.example.gamecatalog.R;
-import com.example.gamecatalog.models.Game;
-import com.example.gamecatalog.utils.ImagePickerHelper;
+import com.example.gamecatalog.data.database.entities.GameEntity;
+import com.example.gamecatalog.utils.ImageLoader;
+
 import java.util.List;
 
 public class GameAdapter extends RecyclerView.Adapter<GameAdapter.ViewHolder> {
-    private List<Game> games;
+
+    private List<GameEntity> games;
     private OnItemClickListener listener;
+    private ImageLoader imageLoader;
 
     public interface OnItemClickListener {
-        void onItemClick(Game game);
-        void onItemLongClick(Game game);
+        void onItemClick(GameEntity game);
+        void onItemLongClick(GameEntity game);
     }
 
-    public GameAdapter(List<Game> games, OnItemClickListener listener) {
+    public GameAdapter(List<GameEntity> games, OnItemClickListener listener) {
         this.games = games;
         this.listener = listener;
+        this.imageLoader = ImageLoader.getInstance();
     }
 
     @NonNull
@@ -36,12 +42,21 @@ public class GameAdapter extends RecyclerView.Adapter<GameAdapter.ViewHolder> {
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        Game game = games.get(position);
+        GameEntity game = games.get(position);
         holder.titleText.setText(game.getTitle());
         holder.genreText.setText(game.getGenre());
         holder.dateText.setText(game.getReleaseDate());
 
-        ImagePickerHelper.loadImageIntoView(game.getImagePath(), holder.ivThumbnail);
+        String imagePath = game.getImagePath();
+        if (imagePath != null && !imagePath.isEmpty()) {
+            if (imagePath.startsWith("http")) {
+                imageLoader.loadImage(imagePath, holder.ivThumbnail, R.drawable.ic_game_placeholder);
+            } else {
+
+            }
+        } else {
+            holder.ivThumbnail.setImageResource(R.drawable.ic_game_placeholder);
+        }
 
         holder.itemView.setOnClickListener(v -> listener.onItemClick(game));
         holder.itemView.setOnLongClickListener(v -> {

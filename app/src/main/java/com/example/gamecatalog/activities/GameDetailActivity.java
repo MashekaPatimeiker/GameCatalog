@@ -14,17 +14,22 @@ import android.widget.Toast;
 
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.lifecycle.ViewModelProvider;
 
 import com.example.gamecatalog.R;
-import com.example.gamecatalog.database.DatabaseHelper;
-import com.example.gamecatalog.models.Game;
+import com.example.gamecatalog.data.database.entities.GameEntity;
+import com.example.gamecatalog.utils.ImageLoader;
+import com.example.gamecatalog.utils.ImageManager;
 import com.example.gamecatalog.utils.ImagePickerHelper;
+import com.example.gamecatalog.viewmodel.GameDetailViewModel;
 
 public class GameDetailActivity extends BaseActivity {
+
     private EditText etTitle, etGenre, etDate, etDescription;
     private Button btnSave, btnDelete, btnSelectImage;
     private ImageView ivGameImage;
-    private DatabaseHelper dbHelper;
+
+    private GameDetailViewModel viewModel;
     private int gameId = -1;
     private String currentImagePath = null;
     private ImagePickerHelper imagePickerHelper;
@@ -36,21 +41,17 @@ public class GameDetailActivity extends BaseActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_game_detail);
 
-        dbHelper = new DatabaseHelper(this);
         initViews();
-
-        imagePickerHelper = new ImagePickerHelper(this, imagePath -> {
-            currentImagePath = imagePath;
-            ImagePickerHelper.loadImageIntoView(imagePath, ivGameImage);
-        });
+        setupViewModel();
+        setupImagePicker();
 
         if (getIntent().hasExtra("game_id")) {
             gameId = getIntent().getIntExtra("game_id", -1);
-            loadGameData();
-            btnDelete.setVisibility(View.VISIBLE);
+            viewModel.loadGameById(gameId);
         }
 
         setupButtons();
+        observeViewModel();
     }
 
     private void initViews() {
@@ -64,15 +65,63 @@ public class GameDetailActivity extends BaseActivity {
         ivGameImage = findViewById(R.id.ivGameImage);
     }
 
-    private void loadGameData() {
-        Game game = dbHelper.getGame(gameId);
-        if (game != null) {
-            etTitle.setText(game.getTitle());
-            etGenre.setText(game.getGenre());
-            etDate.setText(game.getReleaseDate());
-            etDescription.setText(game.getDescription());
-            currentImagePath = game.getImagePath();
-            ImagePickerHelper.loadImageIntoView(currentImagePath, ivGameImage);
+    private void setupViewModel() {
+        viewModel = new ViewModelProvider(this).get(GameDetailViewModel.class);
+    }
+
+    private void setupImagePicker() {
+        imagePickerHelper = new ImagePickerHelper(this, imagePath -> {
+            currentImagePath = imagePath;
+            loadImageIntoView(imagePath);
+        });
+    }
+
+    private void observeViewModel() {
+        viewModel.getCurrentGame().observe(this, game -> {
+            if (game != null) {
+                etTitle.setText(game.getTitle());
+                etGenre.setText(game.getGenre());
+                etDate.setText(game.getReleaseDate());
+                etDescription.setText(game.getDescription());
+                currentImagePath = game.getImagePath();
+                if (currentImagePath != null && !currentImagePath.isEmpty()) {
+                    loadImageIntoView(currentImagePath);
+                }
+            }
+        });
+
+        viewModel.getIsEditMode().observe(this, isEdit -> {
+            if (isEdit) {
+                btnDelete.setVisibility(View.VISIBLE);
+            } else {
+                btnDelete.setVisibility(View.GONE);
+            }
+        });
+    }
+
+    private void loadImageIntoView(String imagePath) {
+        if (imagePath == null || imagePath.isEmpty()) {
+            ivGameImage.setImageResource(R.drawable.ic_game_placeholder);
+            return;
+        }
+
+        if (imagePath.startsWith("http")) {
+            ImageLoader.getInstance().loadImage(imagePath, ivGameImage, R.drawable.ic_game_placeholder,
+                    new ImageLoader.OnImageLoadedListener() {
+                        @Override
+                        public void onLoaded() {
+                        }
+
+                        @Override
+                        public void onError(String error) {
+                            runOnUiThread(() ->
+                                    Toast.makeText(GameDetailActivity.this,
+                                            "Failed to load image: " + error, Toast.LENGTH_SHORT).show()
+                            );
+                        }
+                    });
+        } else {
+            ImageManager.loadImageOptimized(imagePath, ivGameImage);
         }
     }
 
@@ -129,7 +178,9 @@ public class GameDetailActivity extends BaseActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        imagePickerHelper.handleActivityResult(requestCode, resultCode, data);
+        if (imagePickerHelper != null) {
+            imagePickerHelper.handleActivityResult(requestCode, resultCode, data);
+        }
     }
 
     private void saveGame() {
@@ -143,25 +194,25 @@ public class GameDetailActivity extends BaseActivity {
             return;
         }
 
-        if (gameId == -1) {
-            // Создание новой игры
-            Game game = new Game(title, genre, date, description, currentImagePath);
-            dbHelper.addGame(game);
-            Toast.makeText(this, getString(R.string.game_added), Toast.LENGTH_SHORT).show();
-        } else {
-            Game game = new Game(gameId, title, genre, date, description, currentImagePath);
-            dbHelper.updateGame(game);
-            Toast.makeText(this, getString(R.string.game_updated), Toast.LENGTH_SHORT).show();
-        }
+        viewModel.saveGame(title, genre, date, description, currentImagePath);
+
+        Toast.makeText(this,
+                gameId == -1 ? R.string.game_added : R.string.game_updated,
+                Toast.LENGTH_SHORT).show();
 
         finish();
     }
 
     private void deleteGame() {
-        if (gameId != -1) {
-            dbHelper.deleteGame(gameId);
-            Toast.makeText(this, getString(R.string.game_deleted), Toast.LENGTH_SHORT).show();
-        }
-        finish();
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.delete_game_title)
+                .setMessage(R.string.confirm_delete_message)
+                .setPositiveButton(R.string.yes, (dialog, which) -> {
+                    viewModel.deleteGame();
+                    Toast.makeText(this, R.string.game_deleted, Toast.LENGTH_SHORT).show();
+                    finish();
+                })
+                .setNegativeButton(R.string.no, null)
+                .show();
     }
 }

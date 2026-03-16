@@ -15,7 +15,8 @@ public class PreferencesHelper {
     private static final String KEY_FIRST_RUN = "first_run";
 
     private static final String TAG = "PreferencesHelper";
-
+    private static final String KEY_SORT_BY = "sort_by";
+    private static final String KEY_SORT_ORDER = "sort_order";
     private SharedPreferences preferences;
     private Context context;
 
@@ -25,7 +26,24 @@ public class PreferencesHelper {
 
         checkFirstRun();
     }
-
+    public void setSortBy(String sortBy) {
+        preferences.edit().putString(KEY_SORT_BY, sortBy).apply();
+        Log.d(TAG, "Sort by set to: " + sortBy);
+    }
+    public String getSortBy() {
+        return preferences.getString(KEY_SORT_BY, "title");
+    }
+    public void setSortOrder(String sortOrder) {
+        preferences.edit().putString(KEY_SORT_ORDER, sortOrder).apply();
+        Log.d(TAG, "Sort order set to: " + sortOrder);
+    }
+    public String getSortOrder() {
+        return preferences.getString(KEY_SORT_ORDER, "asc");
+    }
+    public String getSortOrderSql() {
+        String order = getSortOrder();
+        return order.equals("desc") ? "DESC" : "ASC";
+    }
     private void checkFirstRun() {
         boolean isFirstRun = preferences.getBoolean(KEY_FIRST_RUN, true);
         if (isFirstRun) {

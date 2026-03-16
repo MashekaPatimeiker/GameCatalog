@@ -1,7 +1,6 @@
 package com.example.gamecatalog.activities;
 
 import android.content.Context;
-import android.content.Intent;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.os.Bundle;

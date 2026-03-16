@@ -1,4 +1,4 @@
-package com.example.gamecatalog.models;
+package com.example.gamecatalog.data.models;
 
 public class Game {
     private int id;

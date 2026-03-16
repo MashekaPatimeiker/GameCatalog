@@ -2,7 +2,6 @@ package com.example.gamecatalog;
 
 import android.app.Application;
 import android.content.Context;
-import android.content.res.Configuration;
 import android.util.Log;
 
 import com.example.gamecatalog.utils.LocaleManager;
