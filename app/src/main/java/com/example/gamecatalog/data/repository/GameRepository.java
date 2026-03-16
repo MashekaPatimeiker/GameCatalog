@@ -253,17 +253,12 @@ public class GameRepository {
                 });
     }
 
-    /**
-     * Локальный поиск в базе данных
-     */
     private void searchGamesLocal(String query) {
         executorService.execute(() -> {
             try {
-                // Получаем все игры из БД
                 List<GameEntity> allGames = database.gameDao().getAllGames();
                 Log.d(TAG, "Total games in DB: " + allGames.size());
 
-                // Фильтруем по названию
                 List<GameEntity> filteredResults = new ArrayList<>();
                 String lowerQuery = query.toLowerCase();
 
@@ -276,7 +271,6 @@ public class GameRepository {
 
                 Log.d(TAG, "Local search found " + filteredResults.size() + " games");
 
-                // Отправляем результаты
                 gamesLiveData.postValue(filteredResults);
 
             } catch (Exception e) {
@@ -299,16 +293,12 @@ public class GameRepository {
             }
         });
     }
-    /**
-     * Очистка дубликатов в базе данных
-     */
     public void removeDuplicates() {
         executorService.execute(() -> {
             try {
                 List<GameEntity> allGames = database.gameDao().getAllGames();
                 Log.d(TAG, "Before cleanup: " + allGames.size() + " games");
 
-                // Используем Set для отслеживания уникальных названий
                 java.util.HashSet<String> uniqueTitles = new java.util.HashSet<>();
                 List<GameEntity> uniqueGames = new ArrayList<>();
 
@@ -319,13 +309,11 @@ public class GameRepository {
                     }
                 }
 
-                // Очищаем БД и сохраняем уникальные игры
                 database.gameDao().deleteAllGames();
                 database.gameDao().insertAllGames(uniqueGames);
 
                 Log.d(TAG, "After cleanup: " + uniqueGames.size() + " games");
 
-                // Обновляем UI
                 loadLocalGames();
 
             } catch (Exception e) {

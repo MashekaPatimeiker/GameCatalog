@@ -18,7 +18,7 @@ import java.util.List;
 
 public class GameAdapter extends RecyclerView.Adapter<GameAdapter.ViewHolder> {
 
-    private List<GameEntity> games = new ArrayList<>(); // Инициализируем пустым списком
+    private List<GameEntity> games = new ArrayList<>();
     private OnItemClickListener listener;
     private ImageLoader imageLoader;
 
@@ -47,13 +47,11 @@ public class GameAdapter extends RecyclerView.Adapter<GameAdapter.ViewHolder> {
         holder.genreText.setText(game.getGenre());
         holder.dateText.setText(game.getReleaseDate());
 
-        // Загружаем изображение, если есть URL
         String imagePath = game.getImagePath();
         if (imagePath != null && !imagePath.isEmpty()) {
             if (imagePath.startsWith("http")) {
                 imageLoader.loadImage(imagePath, holder.ivThumbnail, R.drawable.ic_game_placeholder);
             } else {
-                // Здесь можно использовать ImageManager для локальных файлов
                 holder.ivThumbnail.setImageResource(R.drawable.ic_game_placeholder);
             }
         } else {
@@ -79,7 +77,6 @@ public class GameAdapter extends RecyclerView.Adapter<GameAdapter.ViewHolder> {
         return games.size();
     }
 
-    // Новый метод для обновления списка
     public void updateGames(List<GameEntity> newGames) {
         if (newGames == null) {
             games.clear();
@@ -87,7 +84,7 @@ public class GameAdapter extends RecyclerView.Adapter<GameAdapter.ViewHolder> {
             games.clear();
             games.addAll(newGames);
         }
-        notifyDataSetChanged(); // Простое но надежное обновление
+        notifyDataSetChanged();
     }
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
