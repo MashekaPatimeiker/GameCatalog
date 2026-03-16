@@ -13,11 +13,12 @@ import com.example.gamecatalog.R;
 import com.example.gamecatalog.data.database.entities.GameEntity;
 import com.example.gamecatalog.utils.ImageLoader;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class GameAdapter extends RecyclerView.Adapter<GameAdapter.ViewHolder> {
 
-    private List<GameEntity> games;
+    private List<GameEntity> games = new ArrayList<>(); // Инициализируем пустым списком
     private OnItemClickListener listener;
     private ImageLoader imageLoader;
 
@@ -26,8 +27,7 @@ public class GameAdapter extends RecyclerView.Adapter<GameAdapter.ViewHolder> {
         void onItemLongClick(GameEntity game);
     }
 
-    public GameAdapter(List<GameEntity> games, OnItemClickListener listener) {
-        this.games = games;
+    public GameAdapter(OnItemClickListener listener) {
         this.listener = listener;
         this.imageLoader = ImageLoader.getInstance();
     }
@@ -47,20 +47,29 @@ public class GameAdapter extends RecyclerView.Adapter<GameAdapter.ViewHolder> {
         holder.genreText.setText(game.getGenre());
         holder.dateText.setText(game.getReleaseDate());
 
+        // Загружаем изображение, если есть URL
         String imagePath = game.getImagePath();
         if (imagePath != null && !imagePath.isEmpty()) {
             if (imagePath.startsWith("http")) {
                 imageLoader.loadImage(imagePath, holder.ivThumbnail, R.drawable.ic_game_placeholder);
             } else {
-
+                // Здесь можно использовать ImageManager для локальных файлов
+                holder.ivThumbnail.setImageResource(R.drawable.ic_game_placeholder);
             }
         } else {
             holder.ivThumbnail.setImageResource(R.drawable.ic_game_placeholder);
         }
 
-        holder.itemView.setOnClickListener(v -> listener.onItemClick(game));
+        holder.itemView.setOnClickListener(v -> {
+            if (listener != null) {
+                listener.onItemClick(game);
+            }
+        });
+
         holder.itemView.setOnLongClickListener(v -> {
-            listener.onItemLongClick(game);
+            if (listener != null) {
+                listener.onItemLongClick(game);
+            }
             return true;
         });
     }
@@ -68,6 +77,17 @@ public class GameAdapter extends RecyclerView.Adapter<GameAdapter.ViewHolder> {
     @Override
     public int getItemCount() {
         return games.size();
+    }
+
+    // Новый метод для обновления списка
+    public void updateGames(List<GameEntity> newGames) {
+        if (newGames == null) {
+            games.clear();
+        } else {
+            games.clear();
+            games.addAll(newGames);
+        }
+        notifyDataSetChanged(); // Простое но надежное обновление
     }
 
     public static class ViewHolder extends RecyclerView.ViewHolder {

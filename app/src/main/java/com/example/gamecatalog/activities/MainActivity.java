@@ -23,7 +23,6 @@ import com.example.gamecatalog.adapters.GameAdapter;
 import com.example.gamecatalog.data.database.entities.GameEntity;
 import com.example.gamecatalog.viewmodel.MainViewModel;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends BaseActivity {
@@ -37,7 +36,6 @@ public class MainActivity extends BaseActivity {
     private Toolbar toolbar;
 
     private MainViewModel viewModel;
-    private final List<GameEntity> gameList = new ArrayList<>(); // Добавлен final
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,6 +49,7 @@ public class MainActivity extends BaseActivity {
         setupButtons();
         setupSwipeRefresh();
 
+        // Загружаем данные
         viewModel.loadGames();
     }
 
@@ -74,7 +73,7 @@ public class MainActivity extends BaseActivity {
 
     private void setupRecyclerView() {
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new GameAdapter(gameList, new GameAdapter.OnItemClickListener() {
+        adapter = new GameAdapter(new GameAdapter.OnItemClickListener() {
             @Override
             public void onItemClick(GameEntity game) {
                 Intent intent = new Intent(MainActivity.this, GameDetailActivity.class);
@@ -94,15 +93,15 @@ public class MainActivity extends BaseActivity {
         viewModel = new ViewModelProvider(this).get(MainViewModel.class);
 
         viewModel.getGames().observe(this, games -> {
-            gameList.clear();
-            if (games != null && !games.isEmpty()) {
-                gameList.addAll(games);
-                adapter.notifyItemRangeChanged(0, gameList.size()); // Более эффективно
-                showEmptyState(false);
+            if (games != null) {
+                adapter.updateGames(games);
+                showEmptyState(games.isEmpty());
             } else {
+                adapter.updateGames(null);
                 showEmptyState(true);
             }
         });
+
         viewModel.getError().observe(this, error -> {
             if (error != null && !error.isEmpty()) {
                 Toast.makeText(this, error, Toast.LENGTH_LONG).show();
@@ -161,23 +160,21 @@ public class MainActivity extends BaseActivity {
         getMenuInflater().inflate(R.menu.main_menu, menu);
 
         MenuItem searchItem = menu.findItem(R.id.action_search);
-        if (searchItem != null) { // Проверка на null
+        if (searchItem != null) {
             SearchView searchView = (SearchView) searchItem.getActionView();
-            if (searchView != null) { // Проверка на null
+            if (searchView != null) {
+                searchView.setQueryHint(getString(R.string.search_hint));
+
                 searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
                     @Override
                     public boolean onQueryTextSubmit(String query) {
-                        viewModel.searchGames(query);
+                        performSearch(query);
                         return true;
                     }
 
                     @Override
                     public boolean onQueryTextChange(String newText) {
-                        if (newText.length() > 2) {
-                            viewModel.searchGames(newText);
-                        } else if (newText.isEmpty()) {
-                            viewModel.loadGames();
-                        }
+                        performSearch(newText);
                         return true;
                     }
                 });
@@ -185,6 +182,16 @@ public class MainActivity extends BaseActivity {
         }
 
         return true;
+    }
+
+    private void performSearch(String query) {
+        if (query == null) return;
+
+        if (query.trim().isEmpty()) {
+            viewModel.loadGames();
+        } else {
+            viewModel.searchGames(query);
+        }
     }
 
     @Override

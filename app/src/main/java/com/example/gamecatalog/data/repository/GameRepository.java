@@ -209,21 +209,11 @@ public class GameRepository {
             return;
         }
 
-        String trimmedQuery = query.trim();
+        String trimmedQuery = query.trim().toLowerCase();
         Log.d(TAG, "Searching for: \"" + trimmedQuery + "\"");
 
-        String sortBy = preferencesHelper.getSortBy();
-        String sortOrder = preferencesHelper.getSortOrder();
-
-        boolean isOnline = NetworkUtils.isNetworkAvailable(context);
-
-        if (isOnline) {
-            searchGamesOnline(trimmedQuery, sortBy, sortOrder);
-        } else {
-            searchGamesLocal(trimmedQuery, sortBy, sortOrder);
-        }
+        searchGamesLocal(trimmedQuery);
     }
-
     private void searchGamesOnline(String query, String sortBy, String sortOrder) {
         loadingLiveData.postValue(true);
 
@@ -250,7 +240,7 @@ public class GameRepository {
 
                         } else {
                             Log.w(TAG, "API search failed, falling back to local search");
-                            searchGamesLocal(query, sortBy, sortOrder);
+                            searchGamesLocal(query);
                         }
                     }
 
@@ -258,7 +248,7 @@ public class GameRepository {
                     public void onFailure(Call<List<ApiGame>> call, Throwable t) {
                         loadingLiveData.postValue(false);
                         Log.e(TAG, "API search failed: " + t.getMessage());
-                        searchGamesLocal(query, sortBy, sortOrder);
+                        searchGamesLocal(query);
                     }
                 });
     }
@@ -266,43 +256,35 @@ public class GameRepository {
     /**
      * Локальный поиск в базе данных
      */
-    private void searchGamesLocal(String query, String sortBy, String sortOrder) {
+    private void searchGamesLocal(String query) {
         executorService.execute(() -> {
             try {
-                List<GameEntity> results;
+                // Получаем все игры из БД
+                List<GameEntity> allGames = database.gameDao().getAllGames();
+                Log.d(TAG, "Total games in DB: " + allGames.size());
 
-                // Выбираем метод поиска в зависимости от сортировки
-                if (sortBy.equals("title")) {
-                    if (sortOrder.equals("asc")) {
-                        results = database.gameDao().searchGamesByTitleAsc(query);
-                    } else {
-                        results = database.gameDao().searchGamesByTitleDesc(query);
+                // Фильтруем по названию
+                List<GameEntity> filteredResults = new ArrayList<>();
+                String lowerQuery = query.toLowerCase();
+
+                for (GameEntity game : allGames) {
+                    if (game.getTitle() != null &&
+                            game.getTitle().toLowerCase().contains(lowerQuery)) {
+                        filteredResults.add(game);
                     }
-                } else if (sortBy.equals("release_date")) {
-                    if (sortOrder.equals("asc")) {
-                        results = database.gameDao().searchGamesByDateAsc(query);
-                    } else {
-                        results = database.gameDao().searchGamesByDateDesc(query);
-                    }
-                } else if (sortBy.equals("genre")) {
-                    if (sortOrder.equals("asc")) {
-                        results = database.gameDao().searchGamesByGenreAsc(query);
-                    } else {
-                        results = database.gameDao().searchGamesByGenreDesc(query);
-                    }
-                } else {
-                    results = database.gameDao().searchGamesByTitleAsc(query);
                 }
 
-                Log.d(TAG, "Local search found " + results.size() + " games");
-                gamesLiveData.postValue(results);
+                Log.d(TAG, "Local search found " + filteredResults.size() + " games");
+
+                // Отправляем результаты
+                gamesLiveData.postValue(filteredResults);
 
             } catch (Exception e) {
                 Log.e(TAG, "Error searching local games: " + e.getMessage());
+                errorLiveData.postValue("Search error: " + e.getMessage());
             }
         });
     }
-
     private void saveSearchResultsToDatabase(List<ApiGame> apiGames) {
         executorService.execute(() -> {
             try {
@@ -317,7 +299,40 @@ public class GameRepository {
             }
         });
     }
+    /**
+     * Очистка дубликатов в базе данных
+     */
+    public void removeDuplicates() {
+        executorService.execute(() -> {
+            try {
+                List<GameEntity> allGames = database.gameDao().getAllGames();
+                Log.d(TAG, "Before cleanup: " + allGames.size() + " games");
 
+                // Используем Set для отслеживания уникальных названий
+                java.util.HashSet<String> uniqueTitles = new java.util.HashSet<>();
+                List<GameEntity> uniqueGames = new ArrayList<>();
+
+                for (GameEntity game : allGames) {
+                    if (game.getTitle() != null && !uniqueTitles.contains(game.getTitle())) {
+                        uniqueTitles.add(game.getTitle());
+                        uniqueGames.add(game);
+                    }
+                }
+
+                // Очищаем БД и сохраняем уникальные игры
+                database.gameDao().deleteAllGames();
+                database.gameDao().insertAllGames(uniqueGames);
+
+                Log.d(TAG, "After cleanup: " + uniqueGames.size() + " games");
+
+                // Обновляем UI
+                loadLocalGames();
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error removing duplicates: " + e.getMessage());
+            }
+        });
+    }
     private List<GameEntity> sortGames(List<GameEntity> games, String sortBy, String sortOrder) {
         if (games == null || games.isEmpty()) return games;
 

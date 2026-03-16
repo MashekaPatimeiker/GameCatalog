@@ -17,7 +17,8 @@
     <string name="language">Language</string>
     <string name="english">English</string>
     <string name="russian">Russian</string>
-
+    <!-- В values/strings.xml -->
+    <string name="search_hint">Search by game name...</string>
     <string name="fill_required_fields">Please fill in all required fields</string>
     <string name="game_added">Game added successfully</string>
     <string name="game_updated">Game updated successfully</string>
