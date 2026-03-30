@@ -7,10 +7,12 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Environment;
 import android.provider.MediaStore;
-import android.widget.ImageView;
 import android.widget.Toast;
+
 import androidx.core.content.FileProvider;
+
 import com.example.gamecatalog.R;
+
 import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
@@ -41,7 +43,7 @@ public class ImagePickerHelper {
             try {
                 photoFile = createImageFile();
             } catch (IOException ex) {
-                Toast.makeText(activity, "Ошибка при создании файла", Toast.LENGTH_SHORT).show();
+                Toast.makeText(activity, "Error creating image file", Toast.LENGTH_SHORT).show();
             }
 
             if (photoFile != null) {
@@ -75,16 +77,14 @@ public class ImagePickerHelper {
     public void handleActivityResult(int requestCode, int resultCode, Intent data) {
         if (resultCode == Activity.RESULT_OK) {
             if (requestCode == REQUEST_IMAGE_CAPTURE) {
-                // Фото с камеры
                 galleryAddPic();
                 if (listener != null) {
                     listener.onImageSelected(currentPhotoPath);
                 }
             } else if (requestCode == REQUEST_IMAGE_PICK && data != null) {
-                // Фото из галереи
                 Uri selectedImageUri = data.getData();
                 String imagePath = getPathFromUri(selectedImageUri);
-                if (listener != null) {
+                if (listener != null && imagePath != null) {
                     listener.onImageSelected(imagePath);
                 }
             }
@@ -110,19 +110,5 @@ public class ImagePickerHelper {
             e.printStackTrace();
         }
         return null;
-    }
-
-    public static void loadImageIntoView(String imagePath, ImageView imageView) {
-        if (imagePath != null && !imagePath.isEmpty()) {
-            File imgFile = new File(imagePath);
-            if (imgFile.exists()) {
-                Bitmap bitmap = BitmapFactory.decodeFile(imgFile.getAbsolutePath());
-                imageView.setImageBitmap(bitmap);
-            } else {
-                imageView.setImageResource(R.drawable.ic_game_placeholder);
-            }
-        } else {
-            imageView.setImageResource(R.drawable.ic_game_placeholder);
-        }
     }
 }
