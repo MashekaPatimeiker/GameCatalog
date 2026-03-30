@@ -91,11 +91,7 @@ public class GameDetailActivity extends BaseActivity {
         });
 
         viewModel.getIsEditMode().observe(this, isEdit -> {
-            if (isEdit) {
-                btnDelete.setVisibility(View.VISIBLE);
-            } else {
-                btnDelete.setVisibility(View.GONE);
-            }
+            btnDelete.setVisibility(isEdit ? View.VISIBLE : View.GONE);
         });
     }
 
@@ -106,20 +102,7 @@ public class GameDetailActivity extends BaseActivity {
         }
 
         if (imagePath.startsWith("http")) {
-            ImageLoader.getInstance().loadImage(imagePath, ivGameImage, R.drawable.ic_game_placeholder,
-                    new ImageLoader.OnImageLoadedListener() {
-                        @Override
-                        public void onLoaded() {
-                        }
-
-                        @Override
-                        public void onError(String error) {
-                            runOnUiThread(() ->
-                                    Toast.makeText(GameDetailActivity.this,
-                                            "Failed to load image: " + error, Toast.LENGTH_SHORT).show()
-                            );
-                        }
-                    });
+            ImageLoader.getInstance().loadImage(imagePath, ivGameImage, R.drawable.ic_game_placeholder);
         } else {
             ImageManager.loadImageOptimized(imagePath, ivGameImage);
         }

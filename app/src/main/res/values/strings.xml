@@ -8,10 +8,32 @@
     <string name="genre">Genre</string>
     <string name="release_date">Release Date</string>
     <string name="description">Description</string>
+    <!-- В res/values/strings.xml -->
 
+    <string name="sorted_by">Sorted by</string>
+    <string name="search_mode">Search mode</string>
+    <string name="fuzzy_search">Fuzzy search (tolerates typos)</string>
+    <string name="notification_title">Game Catalog</string>
+    <string name="notification_text">Check out new games! Open the app to see latest updates.</string>
+    <string name="test_notification_title">Test Notification</string>
+    <string name="test_notification_text">This is a test notification from Game Catalog</string>
+    <string name="notifications_enabled">Notifications enabled</string>
+    <string name="notifications_disabled">Notifications disabled</string>
+    <string name="notification_time_set">Notification time set to %02d:%02d</string>
+    <string name="test_notification_sent">Test notification sent</string>
+    <string name="set_notification_time">Set Notification Time</string>
     <string name="save">Save</string>
     <string name="delete">Delete</string>
-
+    <!-- В res/values/strings.xml (английский) -->
+    <string name="sort">Sort</string>
+    <string name="filter">Filter</string>
+    <string name="filter_by_genre">Filter by genre</string>
+    <string name="search_genre">Search genre...</string>
+    <string name="clear_filter">Clear filter</string>
+    <string name="notifications">Notifications</string>
+    <string name="enable_notifications">Enable notifications</string>
+    <string name="notification_time">Notification time</string>
+    <string name="test_notification">Test notification</string>
     <string name="theme">Theme</string>
     <string name="dark_theme">Dark Theme</string>
     <string name="language">Language</string>

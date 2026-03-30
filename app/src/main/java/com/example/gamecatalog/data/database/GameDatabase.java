@@ -8,7 +8,7 @@ import androidx.room.RoomDatabase;
 
 import com.example.gamecatalog.data.database.entities.GameEntity;
 
-@Database(entities = {GameEntity.class}, version = 1, exportSchema = false)
+@Database(entities = {GameEntity.class}, version = 2, exportSchema = false) // Увеличьте версию с 1 на 2
 public abstract class GameDatabase extends RoomDatabase {
 
     private static volatile GameDatabase INSTANCE;

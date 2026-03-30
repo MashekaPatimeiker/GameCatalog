@@ -24,7 +24,7 @@ public class GameEntity {
     private String description;
 
     @ColumnInfo(name = "image_path")
-    private String imagePath; // Может быть URL или локальным путем
+    private String imagePath;
 
     @ColumnInfo(name = "api_id")
     private String apiId;
@@ -32,10 +32,11 @@ public class GameEntity {
     @ColumnInfo(name = "is_synced")
     private boolean isSynced;
 
-    // Конструктор по умолчанию (обязателен для Room)
+    @ColumnInfo(name = "remote_id")
+    private Long remoteId;
+
     public GameEntity() {}
 
-    // Конструктор для создания новой игры (помечаем @Ignore)
     @Ignore
     public GameEntity(String title, String genre, String releaseDate, String description, String imagePath) {
         this.title = title;
@@ -44,20 +45,6 @@ public class GameEntity {
         this.description = description;
         this.imagePath = imagePath;
         this.isSynced = false;
-    }
-
-    // Конструктор с полными параметрами (если нужен)
-    @Ignore
-    public GameEntity(int id, String title, String genre, String releaseDate, String description,
-                      String imagePath, String apiId, boolean isSynced) {
-        this.id = id;
-        this.title = title;
-        this.genre = genre;
-        this.releaseDate = releaseDate;
-        this.description = description;
-        this.imagePath = imagePath;
-        this.apiId = apiId;
-        this.isSynced = isSynced;
     }
 
     // Геттеры и сеттеры
@@ -84,4 +71,7 @@ public class GameEntity {
 
     public boolean isSynced() { return isSynced; }
     public void setSynced(boolean synced) { this.isSynced = synced; }
+
+    public Long getRemoteId() { return remoteId; }
+    public void setRemoteId(Long remoteId) { this.remoteId = remoteId; }
 }

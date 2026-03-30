@@ -48,12 +48,8 @@ public class GameAdapter extends RecyclerView.Adapter<GameAdapter.ViewHolder> {
         holder.dateText.setText(game.getReleaseDate());
 
         String imagePath = game.getImagePath();
-        if (imagePath != null && !imagePath.isEmpty()) {
-            if (imagePath.startsWith("http")) {
-                imageLoader.loadImage(imagePath, holder.ivThumbnail, R.drawable.ic_game_placeholder);
-            } else {
-                holder.ivThumbnail.setImageResource(R.drawable.ic_game_placeholder);
-            }
+        if (imagePath != null && !imagePath.isEmpty() && imagePath.startsWith("http")) {
+            imageLoader.loadImage(imagePath, holder.ivThumbnail, R.drawable.ic_game_placeholder);
         } else {
             holder.ivThumbnail.setImageResource(R.drawable.ic_game_placeholder);
         }

@@ -15,8 +15,6 @@ public class ApiResponse {
     public void setGames(List<ApiGame> games) {
         this.games = games;
     }
-
-    // Для совместимости с существующим кодом
     public List<ApiGame> getResults() {
         return games;
     }

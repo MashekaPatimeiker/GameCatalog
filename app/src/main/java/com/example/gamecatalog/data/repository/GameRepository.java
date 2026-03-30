@@ -6,10 +6,13 @@ import android.util.Log;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
+import com.example.gamecatalog.data.api.RemoteRetrofitClient;
 import com.example.gamecatalog.data.api.RetrofitClient;
 import com.example.gamecatalog.data.api.models.ApiGame;
 import com.example.gamecatalog.data.database.GameDatabase;
 import com.example.gamecatalog.data.database.entities.GameEntity;
+import com.example.gamecatalog.data.models.GameDto;
+import com.example.gamecatalog.utils.FuzzySearch;
 import com.example.gamecatalog.utils.NetworkUtils;
 import com.example.gamecatalog.utils.PreferencesHelper;
 
@@ -36,6 +39,8 @@ public class GameRepository {
     private MutableLiveData<String> errorLiveData;
     private MutableLiveData<Boolean> loadingLiveData;
     private MutableLiveData<Boolean> isOfflineLiveData;
+
+    private static final double FUZZY_THRESHOLD = 0.65;
 
     private GameRepository(Context context) {
         this.context = context.getApplicationContext();
@@ -107,7 +112,7 @@ public class GameRepository {
                     games = database.gameDao().getGamesSortedByTitleAsc();
                 }
 
-                Log.d(TAG, "Loaded " + games.size() + " games from local DB with sort: " + sortBy + " " + sortOrder);
+                Log.d(TAG, "Loaded " + games.size() + " games from local DB");
                 gamesLiveData.postValue(games);
 
                 boolean isOnline = NetworkUtils.isNetworkAvailable(context);
@@ -121,15 +126,15 @@ public class GameRepository {
 
     public void loadGamesSorted(String sortBy, String sortOrder) {
         boolean isOnline = NetworkUtils.isNetworkAvailable(context);
-        Log.d(TAG, "loadGamesSorted: isOnline = " + isOnline + ", sortBy = " + sortBy + ", order = " + sortOrder);
+        Log.d(TAG, "loadGamesSorted: isOnline = " + isOnline);
 
         isOfflineLiveData.postValue(!isOnline);
 
         if (isOnline) {
-            Log.d(TAG, "Online mode: fetching from API with sort");
+            Log.d(TAG, "Online mode: fetching from API");
             fetchGamesFromApiWithSort(sortBy, sortOrder);
         } else {
-            Log.d(TAG, "Offline mode: loading from database with sort");
+            Log.d(TAG, "Offline mode: loading from database");
             loadLocalGamesSorted(sortBy, sortOrder);
             errorLiveData.postValue("No internet connection. Showing cached data.");
         }
@@ -138,20 +143,21 @@ public class GameRepository {
     private void fetchGamesFromApiWithSort(String sortBy, String sortOrder) {
         loadingLiveData.postValue(true);
 
-        RetrofitClient.getInstance().getApiService()
-                .getGames()
-                .enqueue(new Callback<List<ApiGame>>() {
+        RemoteRetrofitClient.getInstance().getRemoteGameApi()
+                .getGames(null, null, sortBy, sortOrder)
+                .enqueue(new Callback<List<GameDto>>() {
                     @Override
-                    public void onResponse(Call<List<ApiGame>> call, Response<List<ApiGame>> response) {
+                    public void onResponse(Call<List<GameDto>> call, Response<List<GameDto>> response) {
                         loadingLiveData.postValue(false);
 
                         if (response.isSuccessful()) {
-                            List<ApiGame> apiGames = response.body();
+                            List<GameDto> games = response.body();
                             Log.d(TAG, "API Response: received " +
-                                    (apiGames != null ? apiGames.size() : 0) + " games");
+                                    (games != null ? games.size() : 0) + " games");
 
-                            if (apiGames != null && !apiGames.isEmpty()) {
-                                saveApiGamesToDatabaseWithSort(apiGames, sortBy, sortOrder);
+                            if (games != null && !games.isEmpty()) {
+                                // ИСПРАВЛЕНО: используем правильный метод
+                                saveGamesToDatabaseWithSort(games, sortBy, sortOrder);
                             } else {
                                 Log.w(TAG, "API returned empty list");
                                 errorLiveData.postValue("No games received from API");
@@ -166,7 +172,7 @@ public class GameRepository {
                     }
 
                     @Override
-                    public void onFailure(Call<List<ApiGame>> call, Throwable t) {
+                    public void onFailure(Call<List<GameDto>> call, Throwable t) {
                         loadingLiveData.postValue(false);
                         String errorMsg = "Network Error: " + t.getMessage();
                         Log.e(TAG, errorMsg, t);
@@ -175,7 +181,6 @@ public class GameRepository {
                     }
                 });
     }
-
     private void saveApiGamesToDatabaseWithSort(List<ApiGame> apiGames, String sortBy, String sortOrder) {
         executorService.execute(() -> {
             try {
@@ -203,57 +208,110 @@ public class GameRepository {
         String sortOrder = preferencesHelper.getSortOrder();
         loadGamesSorted(sortBy, sortOrder);
     }
-    public void searchGames(String query) {
+
+    public void searchGamesFuzzy(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            loadGames();
+            return;
+        }
+
+        String trimmedQuery = query.trim();
+        Log.d(TAG, "Fuzzy search for: \"" + trimmedQuery + "\"");
+
+        searchGamesFuzzyLocal(trimmedQuery);
+    }
+
+    private void saveGamesToDatabaseWithSort(List<GameDto> games, String sortBy, String sortOrder) {
+        executorService.execute(() -> {
+            try {
+                database.gameDao().deleteAllGames();
+
+                List<GameEntity> entities = new ArrayList<>();
+                for (GameDto gameDto : games) {
+                    entities.add(gameDto.toEntity());
+                }
+                database.gameDao().insertAllGames(entities);
+                Log.d(TAG, "Saved " + entities.size() + " new games to database");
+
+                loadLocalGamesSorted(sortBy, sortOrder);
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error saving to database: " + e.getMessage(), e);
+                errorLiveData.postValue("Error saving games: " + e.getMessage());
+            }
+        });
+    }
+    private void searchGamesFuzzyLocal(String query) {
+        executorService.execute(() -> {
+            try {
+                List<GameEntity> allGames = database.gameDao().getAllGames();
+                Log.d(TAG, "Total games in DB: " + allGames.size());
+
+                List<FuzzySearch.SearchResult> fuzzyResults = new ArrayList<>();
+
+                String lowerQuery = query.toLowerCase();
+
+                for (GameEntity game : allGames) {
+                    if (game.getTitle() == null) continue;
+
+                    String lowerTitle = game.getTitle().toLowerCase();
+                    double score = 0;
+
+                    if (lowerTitle.equals(lowerQuery)) {
+                        score = 1.0;
+                    }
+                    else if (lowerTitle.contains(lowerQuery)) {
+                        score = 0.95;
+                    }
+                    else {
+                        score = FuzzySearch.similarity(lowerTitle, lowerQuery);
+                    }
+
+                    if (score >= FUZZY_THRESHOLD) {
+                        fuzzyResults.add(new FuzzySearch.SearchResult(game.getTitle(), score));
+                    }
+                }
+
+                fuzzyResults.sort((a, b) -> Double.compare(b.score, a.score));
+
+                Log.d(TAG, "Fuzzy search found " + fuzzyResults.size() + " games");
+
+                List<GameEntity> searchResults = new ArrayList<>();
+                for (FuzzySearch.SearchResult result : fuzzyResults) {
+                    for (GameEntity game : allGames) {
+                        if (game.getTitle().equals(result.text)) {
+                            searchResults.add(game);
+                            break;
+                        }
+                    }
+                }
+
+                String sortBy = preferencesHelper.getSortBy();
+                String sortOrder = preferencesHelper.getSortOrder();
+                List<GameEntity> sortedResults = sortGames(searchResults, sortBy, sortOrder);
+
+                gamesLiveData.postValue(sortedResults);
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error in fuzzy search: " + e.getMessage());
+                errorLiveData.postValue("Search error: " + e.getMessage());
+            }
+        });
+    }
+
+    public void searchGamesExact(String query) {
         if (query == null || query.trim().isEmpty()) {
             loadGames();
             return;
         }
 
         String trimmedQuery = query.trim().toLowerCase();
-        Log.d(TAG, "Searching for: \"" + trimmedQuery + "\"");
+        Log.d(TAG, "Exact search for: \"" + trimmedQuery + "\"");
 
-        searchGamesLocal(trimmedQuery);
-    }
-    private void searchGamesOnline(String query, String sortBy, String sortOrder) {
-        loadingLiveData.postValue(true);
-
-        RetrofitClient.getInstance().getApiService()
-                .searchGames(query)
-                .enqueue(new Callback<List<ApiGame>>() {
-                    @Override
-                    public void onResponse(Call<List<ApiGame>> call, Response<List<ApiGame>> response) {
-                        loadingLiveData.postValue(false);
-
-                        if (response.isSuccessful() && response.body() != null) {
-                            List<ApiGame> apiGames = response.body();
-                            Log.d(TAG, "API search found " + apiGames.size() + " games");
-
-                            List<GameEntity> searchResults = new ArrayList<>();
-                            for (ApiGame apiGame : apiGames) {
-                                searchResults.add(apiGame.toEntity());
-                            }
-
-                            List<GameEntity> sortedResults = sortGames(searchResults, sortBy, sortOrder);
-                            gamesLiveData.postValue(sortedResults);
-
-                            saveSearchResultsToDatabase(apiGames);
-
-                        } else {
-                            Log.w(TAG, "API search failed, falling back to local search");
-                            searchGamesLocal(query);
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Call<List<ApiGame>> call, Throwable t) {
-                        loadingLiveData.postValue(false);
-                        Log.e(TAG, "API search failed: " + t.getMessage());
-                        searchGamesLocal(query);
-                    }
-                });
+        searchGamesExactLocal(trimmedQuery);
     }
 
-    private void searchGamesLocal(String query) {
+    private void searchGamesExactLocal(String query) {
         executorService.execute(() -> {
             try {
                 List<GameEntity> allGames = database.gameDao().getAllGames();
@@ -269,9 +327,13 @@ public class GameRepository {
                     }
                 }
 
-                Log.d(TAG, "Local search found " + filteredResults.size() + " games");
+                Log.d(TAG, "Exact search found " + filteredResults.size() + " games");
 
-                gamesLiveData.postValue(filteredResults);
+                String sortBy = preferencesHelper.getSortBy();
+                String sortOrder = preferencesHelper.getSortOrder();
+                List<GameEntity> sortedResults = sortGames(filteredResults, sortBy, sortOrder);
+
+                gamesLiveData.postValue(sortedResults);
 
             } catch (Exception e) {
                 Log.e(TAG, "Error searching local games: " + e.getMessage());
@@ -279,48 +341,7 @@ public class GameRepository {
             }
         });
     }
-    private void saveSearchResultsToDatabase(List<ApiGame> apiGames) {
-        executorService.execute(() -> {
-            try {
-                List<GameEntity> entities = new ArrayList<>();
-                for (ApiGame apiGame : apiGames) {
-                    entities.add(apiGame.toEntity());
-                }
-                database.gameDao().insertAllGames(entities);
-                Log.d(TAG, "Saved " + entities.size() + " search results to database");
-            } catch (Exception e) {
-                Log.e(TAG, "Error saving search results: " + e.getMessage());
-            }
-        });
-    }
-    public void removeDuplicates() {
-        executorService.execute(() -> {
-            try {
-                List<GameEntity> allGames = database.gameDao().getAllGames();
-                Log.d(TAG, "Before cleanup: " + allGames.size() + " games");
 
-                java.util.HashSet<String> uniqueTitles = new java.util.HashSet<>();
-                List<GameEntity> uniqueGames = new ArrayList<>();
-
-                for (GameEntity game : allGames) {
-                    if (game.getTitle() != null && !uniqueTitles.contains(game.getTitle())) {
-                        uniqueTitles.add(game.getTitle());
-                        uniqueGames.add(game);
-                    }
-                }
-
-                database.gameDao().deleteAllGames();
-                database.gameDao().insertAllGames(uniqueGames);
-
-                Log.d(TAG, "After cleanup: " + uniqueGames.size() + " games");
-
-                loadLocalGames();
-
-            } catch (Exception e) {
-                Log.e(TAG, "Error removing duplicates: " + e.getMessage());
-            }
-        });
-    }
     private List<GameEntity> sortGames(List<GameEntity> games, String sortBy, String sortOrder) {
         if (games == null || games.isEmpty()) return games;
 
@@ -360,12 +381,6 @@ public class GameRepository {
 
         sortedList.sort(comparator);
         return sortedList;
-    }
-
-    public void updateSortSettings(String sortBy, String sortOrder) {
-        preferencesHelper.setSortBy(sortBy);
-        preferencesHelper.setSortOrder(sortOrder);
-        loadGamesSorted(sortBy, sortOrder);
     }
 
     public void addGame(GameEntity game) {
@@ -421,22 +436,118 @@ public class GameRepository {
         });
     }
 
-    public void clearOldData() {
+    public interface OnGameLoadedListener {
+        void onGameLoaded(GameEntity game);
+    }
+    public void loadGamesFiltered(String genre, String sortBy, String sortOrder) {
+        boolean isOnline = NetworkUtils.isNetworkAvailable(context);
+        Log.d(TAG, "loadGamesFiltered: isOnline = " + isOnline + ", genre = " + genre);
+
+        isOfflineLiveData.postValue(!isOnline);
+
+        if (isOnline) {
+            Log.d(TAG, "Online mode: fetching from API with filter");
+            fetchGamesFromApiWithFilter(genre, sortBy, sortOrder);
+        } else {
+            Log.d(TAG, "Offline mode: loading from database with filter");
+            loadLocalGamesFiltered(genre, sortBy, sortOrder);
+            errorLiveData.postValue("No internet connection. Showing cached data.");
+        }
+    }
+
+    private void loadLocalGamesFiltered(String genre, String sortBy, String sortOrder) {
         executorService.execute(() -> {
             try {
-                int count = database.gameDao().getGamesCount();
-                database.gameDao().deleteAllGames();
-                Log.d(TAG, "Cleared " + count + " old games from database");
+                List<GameEntity> allGames = database.gameDao().getAllGames();
 
-                List<GameEntity> emptyList = new ArrayList<>();
-                gamesLiveData.postValue(emptyList);
+                List<GameEntity> filteredGames = new ArrayList<>();
+                String lowerGenre = genre.toLowerCase();
+
+                for (GameEntity game : allGames) {
+                    if (game.getGenre() != null &&
+                            game.getGenre().toLowerCase().contains(lowerGenre)) {
+                        filteredGames.add(game);
+                    }
+                }
+
+                Log.d(TAG, "Filtered games by genre '" + genre + "': found " + filteredGames.size() + " games");
+
+                List<GameEntity> sortedResults = sortGames(filteredGames, sortBy, sortOrder);
+                gamesLiveData.postValue(sortedResults);
+
+                boolean isOnline = NetworkUtils.isNetworkAvailable(context);
+                isOfflineLiveData.postValue(!isOnline);
             } catch (Exception e) {
-                Log.e(TAG, "Error clearing data: " + e.getMessage());
+                Log.e(TAG, "Error loading filtered games: " + e.getMessage());
+                errorLiveData.postValue("Error loading games: " + e.getMessage());
             }
         });
     }
 
-    public interface OnGameLoadedListener {
-        void onGameLoaded(GameEntity game);
+    private void fetchGamesFromApiWithFilter(String genre, String sortBy, String sortOrder) {
+        loadingLiveData.postValue(true);
+
+        RetrofitClient.getInstance().getApiService()
+                .getGames()
+                .enqueue(new Callback<List<ApiGame>>() {
+                    @Override
+                    public void onResponse(Call<List<ApiGame>> call, Response<List<ApiGame>> response) {
+                        loadingLiveData.postValue(false);
+
+                        if (response.isSuccessful()) {
+                            List<ApiGame> apiGames = response.body();
+                            if (apiGames != null && !apiGames.isEmpty()) {
+                                // Фильтруем по жанру
+                                List<ApiGame> filteredGames = new ArrayList<>();
+                                String lowerGenre = genre.toLowerCase();
+
+                                for (ApiGame apiGame : apiGames) {
+                                    if (apiGame.getGenre() != null &&
+                                            apiGame.getGenre().toLowerCase().contains(lowerGenre)) {
+                                        filteredGames.add(apiGame);
+                                    }
+                                }
+
+                                saveApiGamesToDatabaseWithFilter(filteredGames, sortBy, sortOrder);
+                            } else {
+                                loadLocalGamesFiltered(genre, sortBy, sortOrder);
+                            }
+                        } else {
+                            loadLocalGamesFiltered(genre, sortBy, sortOrder);
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<List<ApiGame>> call, Throwable t) {
+                        loadingLiveData.postValue(false);
+                        loadLocalGamesFiltered(genre, sortBy, sortOrder);
+                    }
+                });
+    }
+
+    private void saveApiGamesToDatabaseWithFilter(List<ApiGame> apiGames, String sortBy, String sortOrder) {
+        executorService.execute(() -> {
+            try {
+                List<GameEntity> entities = new ArrayList<>();
+                for (ApiGame apiGame : apiGames) {
+                    entities.add(apiGame.toEntity());
+                }
+
+                database.gameDao().insertAllGames(entities);
+                Log.d(TAG, "Saved " + entities.size() + " filtered games to database");
+
+                loadLocalGamesFiltered(apiGames.get(0).getGenre(), sortBy, sortOrder);
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error saving filtered games: " + e.getMessage(), e);
+                errorLiveData.postValue("Error saving games: " + e.getMessage());
+            }
+        });
+    }
+
+    public void updateSortSettings(String sortBy, String sortOrder) {
+        preferencesHelper.setSortBy(sortBy);
+        preferencesHelper.setSortOrder(sortOrder);
+        loadGamesSorted(sortBy, sortOrder);
     }
 }

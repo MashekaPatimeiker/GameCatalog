@@ -51,48 +51,17 @@ public class ImageLoader {
         });
     }
 
-    public void loadImage(String url, ImageView imageView, int placeholderResId, OnImageLoadedListener listener) {
-        imageView.setImageResource(placeholderResId);
-
-        if (url == null || url.isEmpty()) {
-            if (listener != null) {
-                listener.onError("URL is empty");
-            }
-            return;
-        }
-
-        executorService.execute(() -> {
-            try {
-                Bitmap bitmap = downloadImage(url);
-                if (bitmap != null) {
-                    mainHandler.post(() -> {
-                        imageView.setImageBitmap(bitmap);
-                        if (listener != null) {
-                            listener.onLoaded();
-                        }
-                    });
-                } else {
-                    mainHandler.post(() -> {
-                        if (listener != null) {
-                            listener.onError("Failed to download image");
-                        }
-                    });
-                }
-            } catch (Exception e) {
-                mainHandler.post(() -> {
-                    if (listener != null) {
-                        listener.onError(e.getMessage());
-                    }
-                });
-            }
-        });
-    }
-
     private Bitmap downloadImage(String imageUrl) throws IOException {
         URL url = new URL(imageUrl);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setDoInput(true);
+        connection.setConnectTimeout(5000);
+        connection.setReadTimeout(5000);
         connection.connect();
+
+        if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
+            return null;
+        }
 
         InputStream input = connection.getInputStream();
         Bitmap bitmap = BitmapFactory.decodeStream(input);
@@ -100,10 +69,5 @@ public class ImageLoader {
         connection.disconnect();
 
         return bitmap;
-    }
-
-    public interface OnImageLoadedListener {
-        void onLoaded();
-        void onError(String error);
     }
 }

@@ -5,20 +5,20 @@ import okhttp3.logging.HttpLoggingInterceptor;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
-public class RetrofitClient {
+public class RemoteRetrofitClient {
 
     private static final String BASE_URL = "http://10.0.2.2:8080/";
 
-    private static RetrofitClient instance;
+    private static RemoteRetrofitClient instance;
     private Retrofit retrofit;
-    private ApiService apiService;
+    private RemoteGameApi remoteGameApi;
 
-    private RetrofitClient() {
-        HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor();
-        loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
+    private RemoteRetrofitClient() {
+        HttpLoggingInterceptor logging = new HttpLoggingInterceptor();
+        logging.setLevel(HttpLoggingInterceptor.Level.BODY);
 
         OkHttpClient client = new OkHttpClient.Builder()
-                .addInterceptor(loggingInterceptor)
+                .addInterceptor(logging)
                 .build();
 
         retrofit = new Retrofit.Builder()
@@ -27,17 +27,17 @@ public class RetrofitClient {
                 .addConverterFactory(GsonConverterFactory.create())
                 .build();
 
-        apiService = retrofit.create(ApiService.class);
+        remoteGameApi = retrofit.create(RemoteGameApi.class);
     }
 
-    public static synchronized RetrofitClient getInstance() {
+    public static synchronized RemoteRetrofitClient getInstance() {
         if (instance == null) {
-            instance = new RetrofitClient();
+            instance = new RemoteRetrofitClient();
         }
         return instance;
     }
 
-    public ApiService getApiService() {
-        return apiService;
+    public RemoteGameApi getRemoteGameApi() {
+        return remoteGameApi;
     }
 }
