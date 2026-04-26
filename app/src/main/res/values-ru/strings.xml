@@ -1,58 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- App -->
     <string name="app_name">Каталог игр</string>
+
+    <!-- Common -->
     <string name="loading">Загрузка...</string>
     <string name="add_game">Добавить игру</string>
     <string name="settings">Настройки</string>
+    <string name="save">Сохранить</string>
+    <string name="delete">Удалить</string>
+    <string name="apply">Применить</string>
+    <string name="search">Поиск</string>
+    <string name="sync">Синхр.</string>
+    <string name="syncing">Синхронизация данных...</string>
+    <string name="sort">Сортировка</string>
+    <string name="filter">Фильтр</string>
+    <string name="yes">Да</string>
+    <string name="no">Нет</string>
 
+    <!-- Game fields -->
     <string name="title">Название</string>
     <string name="genre">Жанр</string>
     <string name="release_date">Дата выхода</string>
     <string name="description">Описание</string>
-    <!-- В res/values-ru/strings.xml -->
-    <!-- В values-ru/strings.xml -->
-    <string name="search_mode">Режим поиска</string>
-    <string name="fuzzy_search">Нечеткий поиск (с опечатками)</string>
+
+    <!-- Menu -->
+    <string name="menu_settings">Настройки</string>
+    <string name="menu_about">О приложении</string>
+    <string name="about_message">Каталог игр v1.0\nПросматривайте и управляйте любимыми играми</string>
+
+    <!-- Sort -->
+    <string name="sort_by">Сортировать по</string>
+    <string name="sort_order">Порядок сортировки</string>
     <string name="sorted_by">Сортировка по</string>
-    <string name="set_notification_time">Установить время уведомления</string>
+    <string name="ascending">По возрастанию (А-Я)</string>
+    <string name="descending">По убыванию (Я-А)</string>
+    <string name="sort_settings">Настройки сортировки</string>
+    <string name="sort_settings_applied">Настройки сортировки применены</string>
+    <string name="select_sort_options">Выберите параметры сортировки</string>
+
+    <!-- Filter -->
+    <string name="filter_by_genre">Фильтр по жанру</string>
+    <string name="search_genre">Поиск жанра...</string>
+    <string name="clear_filter">Сбросить фильтр</string>
+
+    <!-- Search -->
+    <string name="search_mode">Режим поиска</string>
+    <string name="search_hint">Поиск по названию игры...</string>
+    <string name="fuzzy_search">Нечеткий поиск (с опечатками)</string>
+
+    <!-- Location -->
+    <string name="location_permission_denied">Разрешение на определение местоположения отклонено</string>
+
+    <!-- Game actions -->
+    <string name="added_to_favorites">добавлено в избранное</string>
+    <string name="removed_from_favorites">удалено из избранного</string>
+    <string name="share_via">Поделиться через</string>
+    <string name="realtime_sync_active">Синхронизация в реальном времени активна</string>
+
+    <!-- Auth -->
+    <string name="login_success">Вход выполнен успешно</string>
+    <string name="registration_success">Регистрация успешно завершена</string>
+    <string name="email_required">Требуется email</string>
+    <string name="password_required">Требуется пароль</string>
+    <string name="password_too_short">Пароль должен содержать не менее 6 символов</string>
+    <string name="enter_username">Пожалуйста, введите имя пользователя</string>
+    <string name="create_account">Создать аккаунт</string>
+    <string name="back_to_login">Вернуться ко входу</string>
+    <string name="login">Войти</string>
+    <string name="register">Зарегистрироваться</string>
+
+    <!-- Notifications -->
+    <string name="notifications">Уведомления</string>
+    <string name="enable_notifications">Включить уведомления</string>
+    <string name="notification_time">Время уведомления</string>
+    <string name="test_notification">Тестовое уведомление</string>
     <string name="notification_title">Каталог игр</string>
     <string name="notification_text">Проверьте новые игры! Откройте приложение, чтобы увидеть последние обновления.</string>
     <string name="test_notification_title">Тестовое уведомление</string>
     <string name="test_notification_text">Это тестовое уведомление от Каталога игр</string>
     <string name="notifications_enabled">Уведомления включены</string>
     <string name="notifications_disabled">Уведомления отключены</string>
-    <string name="notification_time_set">Время уведомления установлено на %02d:%02d</string>
+    <string name="notification_time_set" formatted="false">Время уведомления установлено на %02d:%02d</string>
     <string name="test_notification_sent">Тестовое уведомление отправлено</string>
-    <string name="save">Сохранить</string>
-    <string name="delete">Удалить</string>
-    <!-- В res/values-ru/strings.xml (русский) -->
-    <string name="sort">Сортировка</string>
-    <string name="filter">Фильтр</string>
-    <string name="filter_by_genre">Фильтр по жанру</string>
-    <string name="search_genre">Поиск жанра...</string>
-    <string name="clear_filter">Сбросить фильтр</string>
-    <string name="notifications">Уведомления</string>
-    <string name="enable_notifications">Включить уведомления</string>
-    <string name="notification_time">Время уведомления</string>
-    <string name="test_notification">Тестовое уведомление</string>
+    <string name="set_notification_time">Установить время уведомления</string>
+
+    <!-- Theme -->
     <string name="theme">Тема</string>
     <string name="dark_theme">Темная тема</string>
+
+    <!-- Language -->
     <string name="language">Язык</string>
     <string name="english">Английский</string>
     <string name="russian">Русский</string>
-    <!-- В values-ru/strings.xml -->
-    <string name="search_hint">Поиск по названию игры...</string>
-    <string name="fill_required_fields">Заполните все обязательные поля</string>
-    <string name="game_added">Игра успешно добавлена</string>
-    <string name="game_updated">Игра успешно обновлена</string>
-    <string name="game_deleted">Игра успешно удалена</string>
-    <string name="sort_settings">Настройки сортировки</string>
-    <string name="sort_by">Сортировать по</string>
-    <string name="sort_order">Порядок сортировки</string>
-    <string name="ascending">По возрастанию (А-Я)</string>
-    <string name="descending">По убыванию (Я-А)</string>
-    <string name="apply">Применить</string>
-    <string name="sort_settings_applied">Настройки сортировки применены</string>
-    <string name="select_sort_options">Выберите параметры сортировки</string>
+
+    <!-- Image -->
     <string name="select_image">Выбрать изображение</string>
     <string name="choose_image_source">Выберите источник</string>
     <string name="take_photo">Сделать фото</string>
@@ -60,14 +102,13 @@
     <string name="error_creating_file">Ошибка при создании файла</string>
     <string name="camera_permission_denied">Необходимо разрешение на использование камеры</string>
 
-    <string name="syncing">Синхронизация данных...</string>
-    <string name="no_internet_connection">Нет интернета. Показываем сохраненные данные.</string>
-    <string name="no_games">Игры не найдены</string>
-    <string name="search">Поиск</string>
-    <string name="sync">Синхр.</string>
-
+    <!-- Messages -->
+    <string name="fill_required_fields">Заполните все обязательные поля</string>
+    <string name="game_added">Игра успешно добавлена</string>
+    <string name="game_updated">Игра успешно обновлена</string>
+    <string name="game_deleted">Игра успешно удалена</string>
     <string name="delete_game_title">Удалить игру</string>
     <string name="confirm_delete_message">Вы уверены, что хотите удалить эту игру?</string>
-    <string name="yes">Да</string>
-    <string name="no">Нет</string>
+    <string name="no_internet_connection">Нет интернета. Показываем сохраненные данные.</string>
+    <string name="no_games">Игры не найдены</string>
 </resources>

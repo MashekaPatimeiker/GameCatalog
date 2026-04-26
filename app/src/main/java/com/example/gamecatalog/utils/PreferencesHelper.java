@@ -26,7 +26,61 @@ public class PreferencesHelper {
 
     private SharedPreferences preferences;
     private Context context;
+    // Добавьте эти константы в начало класса PreferencesHelper
+    private static final String KEY_IS_LOGGED_IN = "is_logged_in";
+    private static final String KEY_AUTH_TOKEN = "auth_token";
+    private static final String KEY_USER_ID = "user_id";
+    private static final String KEY_USER_EMAIL = "user_email";
+    private static final String KEY_USERNAME = "username";
 
+    // Добавьте эти методы в PreferencesHelper
+    public void setLoggedIn(boolean isLoggedIn) {
+        preferences.edit().putBoolean(KEY_IS_LOGGED_IN, isLoggedIn).apply();
+    }
+
+    public boolean isLoggedIn() {
+        return preferences.getBoolean(KEY_IS_LOGGED_IN, false);
+    }
+
+    public void setAuthToken(String token) {
+        preferences.edit().putString(KEY_AUTH_TOKEN, token).apply();
+    }
+
+    public String getAuthToken() {
+        return preferences.getString(KEY_AUTH_TOKEN, null);
+    }
+
+    public void setUserId(int userId) {
+        preferences.edit().putInt(KEY_USER_ID, userId).apply();
+    }
+
+    public int getUserId() {
+        return preferences.getInt(KEY_USER_ID, -1);
+    }
+
+    public void setUserEmail(String email) {
+        preferences.edit().putString(KEY_USER_EMAIL, email).apply();
+    }
+
+    public String getUserEmail() {
+        return preferences.getString(KEY_USER_EMAIL, "");
+    }
+
+    public void setUsername(String username) {
+        preferences.edit().putString(KEY_USERNAME, username).apply();
+    }
+
+    public String getUsername() {
+        return preferences.getString(KEY_USERNAME, "");
+    }
+
+    public void logout() {
+        preferences.edit()
+                .putBoolean(KEY_IS_LOGGED_IN, false)
+                .putString(KEY_AUTH_TOKEN, null)
+                .putInt(KEY_USER_ID, -1)
+                .apply();
+    }
     public PreferencesHelper(Context context) {
         this.context = context;
         this.preferences = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);

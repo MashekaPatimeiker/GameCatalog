@@ -1,0 +1,284 @@
+<?php
+header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-User-Id');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
+
+// Database configuration
+$host = getenv('DB_HOST') ?: 'postgres';
+$port = getenv('DB_PORT') ?: '5432';
+$dbname = getenv('DB_NAME') ?: 'game_catalog';
+$user = getenv('DB_USER') ?: 'gameuser';
+$password = getenv('DB_PASS') ?: 'game123';
+
+try {
+    $pdo = new PDO("pgsql:host=$host;port=$port;dbname=$dbname", $user, $password);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
+    exit();
+}
+
+$method = $_SERVER['REQUEST_METHOD'];
+$input = json_decode(file_get_contents('php://input'), true);
+$action = isset($_GET['action']) ? $_GET['action'] : '';
+
+// Get user ID from headers (simplified)
+function getUserId($pdo) {
+    $headers = getallheaders();
+    if (isset($headers['X-User-Id'])) {
+        $firebaseUid = $headers['X-User-Id'];
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE firebase_uid = ?");
+        $stmt->execute([$firebaseUid]);
+        $user = $stmt->fetch();
+        if ($user) {
+            return $user['id'];
+        }
+    }
+    return 1; // Default user ID for demo
+}
+
+$userId = getUserId($pdo);
+
+switch ($action) {
+    case 'ping':
+        echo json_encode(['status' => 'ok', 'timestamp' => time()]);
+        break;
+case 'register':
+    if ($method !== 'POST') {
+        http_response_code(405);
+        break;
+    }
+
+    $email = $input['email'] ?? '';
+    $password = $input['password'] ?? '';
+    $username = $input['username'] ?? '';
+
+    error_log("Register attempt: email=$email, username=$username");
+
+    if (empty($email) || empty($password) || empty($username)) {
+        echo json_encode(['success' => false, 'error' => 'All fields required']);
+        break;
+    }
+
+    try {
+        $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+        $stmt = $pdo->prepare("INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?) RETURNING id");
+        $stmt->execute([$username, $email, $passwordHash]);
+        $user = $stmt->fetch();
+
+        if (!$user) {
+            echo json_encode(['success' => false, 'error' => 'Failed to create user']);
+            break;
+        }
+
+        // Create token
+        $token = bin2hex(random_bytes(32));
+        $stmt = $pdo->prepare("UPDATE users SET token = ? WHERE id = ?");
+        $stmt->execute([$token, $user['id']]);
+
+        echo json_encode([
+            'success' => true,
+            'user_id' => $user['id'],
+            'username' => $username,
+            'token' => $token
+        ]);
+    } catch (PDOException $e) {
+        error_log("Register error: " . $e->getMessage());
+        echo json_encode(['success' => false, 'error' => 'Email already exists']);
+    }
+    break;
+
+case 'login':
+    if ($method !== 'POST') {
+        http_response_code(405);
+        break;
+    }
+
+    $email = $input['email'] ?? '';
+    $password = $input['password'] ?? '';
+
+    error_log("Login attempt: email=$email");
+
+    if (empty($email) || empty($password)) {
+        echo json_encode(['success' => false, 'error' => 'Email and password required']);
+        break;
+    }
+
+    $stmt = $pdo->prepare("SELECT id, username, email, password_hash FROM users WHERE email = ?");
+    $stmt->execute([$email]);
+    $user = $stmt->fetch();
+
+    if ($user && password_verify($password, $user['password_hash'])) {
+        // Update token
+        $token = bin2hex(random_bytes(32));
+        $stmt = $pdo->prepare("UPDATE users SET token = ? WHERE id = ?");
+        $stmt->execute([$token, $user['id']]);
+
+        echo json_encode([
+            'success' => true,
+            'user_id' => $user['id'],
+            'username' => $user['username'],
+            'email' => $user['email'],
+            'token' => $token
+        ]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Invalid email or password']);
+    }
+    break;
+
+    case 'games':
+        if ($method === 'GET') {
+            $search = isset($_GET['search']) ? $_GET['search'] : '';
+            $genre = isset($_GET['genre']) ? $_GET['genre'] : '';
+            $sortBy = isset($_GET['sortBy']) ? $_GET['sortBy'] : 'title';
+            $sortOrder = isset($_GET['sortOrder']) ? $_GET['sortOrder'] : 'ASC';
+
+            $sql = "SELECT id, title, genre, release_date, description, image_path, is_synced FROM games";
+            $where = [];
+            $params = [];
+
+            if (!empty($search)) {
+                $where[] = "title ILIKE ?";
+                $params[] = "%$search%";
+            }
+
+            if (!empty($genre) && $genre !== 'All') {
+                $where[] = "genre ILIKE ?";
+                $params[] = "%$genre%";
+            }
+
+            if (!empty($where)) {
+                $sql .= " WHERE " . implode(" AND ", $where);
+            }
+
+            $allowedSort = ['title', 'genre', 'release_date'];
+            $sortBy = in_array($sortBy, $allowedSort) ? $sortBy : 'title';
+            $sortOrder = strtoupper($sortOrder) === 'DESC' ? 'DESC' : 'ASC';
+
+            $sql .= " ORDER BY $sortBy $sortOrder";
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $games = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Return as array directly (not wrapped in success/data)
+            echo json_encode($games);
+
+        } elseif ($method === 'POST') {
+            if (!$input) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid input']);
+                break;
+            }
+
+            $stmt = $pdo->prepare("INSERT INTO games (title, genre, release_date, description, image_path, user_id, is_synced) VALUES (?, ?, ?, ?, ?, ?, true) RETURNING id");
+            $stmt->execute([
+                $input['title'] ?? '',
+                $input['genre'] ?? '',
+                $input['release_date'] ?? '',
+                $input['description'] ?? '',
+                $input['image_path'] ?? '',
+                $userId
+            ]);
+            $result = $stmt->fetch();
+            echo json_encode(['success' => true, 'id' => $result['id']]);
+
+        } elseif ($method === 'PUT') {
+            $gameId = isset($_GET['id']) ? (int)$_GET['id'] : null;
+            if (!$gameId) {
+                echo json_encode(['error' => 'Game ID required']);
+                break;
+            }
+
+            $stmt = $pdo->prepare("UPDATE games SET title = ?, genre = ?, release_date = ?, description = ?, image_path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING id");
+            $stmt->execute([
+                $input['title'] ?? '',
+                $input['genre'] ?? '',
+                $input['release_date'] ?? '',
+                $input['description'] ?? '',
+                $input['image_path'] ?? '',
+                $gameId
+            ]);
+
+            if ($stmt->fetch()) {
+                echo json_encode(['success' => true]);
+            } else {
+                echo json_encode(['error' => 'Game not found']);
+            }
+
+        } elseif ($method === 'DELETE') {
+            $gameId = isset($_GET['id']) ? (int)$_GET['id'] : null;
+            if (!$gameId) {
+                echo json_encode(['error' => 'Game ID required']);
+                break;
+            }
+
+            $stmt = $pdo->prepare("DELETE FROM games WHERE id = ?");
+            $stmt->execute([$gameId]);
+            echo json_encode(['success' => true, 'deleted' => $stmt->rowCount()]);
+        }
+        break;
+
+    case 'favorites':
+        if ($method === 'GET') {
+            $stmt = $pdo->prepare("SELECT g.* FROM favorites f JOIN games g ON f.game_id = g.id WHERE f.user_id = ?");
+            $stmt->execute([$userId]);
+            echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+
+        } elseif ($method === 'POST') {
+            $gameId = $input['game_id'] ?? null;
+            if (!$gameId) {
+                echo json_encode(['error' => 'Game ID required']);
+                break;
+            }
+
+            try {
+                $stmt = $pdo->prepare("INSERT INTO favorites (user_id, game_id) VALUES (?, ?)");
+                $stmt->execute([$userId, $gameId]);
+                echo json_encode(['success' => true]);
+            } catch (PDOException $e) {
+                echo json_encode(['success' => false, 'error' => 'Already in favorites']);
+            }
+
+        } elseif ($method === 'DELETE') {
+            $gameId = isset($_GET['game_id']) ? (int)$_GET['game_id'] : null;
+            if (!$gameId) {
+                echo json_encode(['error' => 'Game ID required']);
+                break;
+            }
+
+            $stmt = $pdo->prepare("DELETE FROM favorites WHERE user_id = ? AND game_id = ?");
+            $stmt->execute([$userId, $gameId]);
+            echo json_encode(['success' => true, 'deleted' => $stmt->rowCount()]);
+        }
+        break;
+
+    default:
+        // Default response for root endpoint
+        echo json_encode([
+            'message' => 'Game Catalog API',
+            'version' => '1.0',
+            'endpoints' => [
+                'GET ?action=ping' => 'Health check',
+                'POST ?action=register' => 'Register user',
+                'POST ?action=login' => 'Login user',
+                'GET ?action=games' => 'Get all games',
+                'POST ?action=games' => 'Create game',
+                'PUT ?action=games&id={id}' => 'Update game',
+                'DELETE ?action=games&id={id}' => 'Delete game',
+                'GET ?action=favorites' => 'Get favorites',
+                'POST ?action=favorites' => 'Add to favorites',
+                'DELETE ?action=favorites&game_id={id}' => 'Remove from favorites'
+            ]
+        ]);
+}
+
+$pdo = null;
+?>

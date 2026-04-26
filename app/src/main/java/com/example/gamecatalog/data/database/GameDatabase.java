@@ -8,7 +8,8 @@ import androidx.room.RoomDatabase;
 
 import com.example.gamecatalog.data.database.entities.GameEntity;
 
-@Database(entities = {GameEntity.class}, version = 2, exportSchema = false) // Увеличьте версию с 1 на 2
+// Увеличьте версию с 2 на 3
+@Database(entities = {GameEntity.class}, version = 3, exportSchema = false)
 public abstract class GameDatabase extends RoomDatabase {
 
     private static volatile GameDatabase INSTANCE;
@@ -22,7 +23,7 @@ public abstract class GameDatabase extends RoomDatabase {
                 if (INSTANCE == null) {
                     INSTANCE = Room.databaseBuilder(context.getApplicationContext(),
                                     GameDatabase.class, DATABASE_NAME)
-                            .fallbackToDestructiveMigration()
+                            .fallbackToDestructiveMigration()  // Это пересоздаст БД при изменении версии
                             .build();
                 }
             }

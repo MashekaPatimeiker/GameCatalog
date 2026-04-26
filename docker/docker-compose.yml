@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # PostgreSQL
+  postgres:
+    image: postgres:15
+    container_name: game_catalog_postgres
+    environment:
+      POSTGRES_DB: game_catalog
+      POSTGRES_USER: gameuser
+      POSTGRES_PASSWORD: game123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - game_network
+
+  # PHP API
+  php:
+    build:
+      context: ./php
+      dockerfile: Dockerfile
+    container_name: game_catalog_php
+    ports:
+      - "8080:80"
+    volumes:
+      - ../backend:/var/www/html
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=game_catalog
+      - DB_USER=gameuser
+      - DB_PASS=game123
+    depends_on:
+      - postgres
+    networks:
+      - game_network
+
+  # Firebase Emulator Suite
+  firebase:
+    image: node:18-alpine
+    container_name: game_catalog_firebase
+    working_dir: /app
+    ports:
+      - "4000:4000"   # Emulator Suite UI
+      - "5001:5001"   # Cloud Functions
+      - "8085:8085"   # Firestore
+      - "9099:9099"   # Authentication
+      - "5000:5000"   # Realtime Database
+    volumes:
+      - ./firebase:/app
+    command: >
+      sh -c "
+        npm install -g firebase-tools &&
+        firebase emulators:start --project demo-game-catalog
+      "
+    networks:
+      - game_network
+
+  # PgAdmin (optional)
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: game_catalog_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@gamecatalog.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - game_network
+
+volumes:
+  postgres_data:
+
+networks:
+  game_network:
+    driver: bridge

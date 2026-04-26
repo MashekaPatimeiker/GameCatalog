@@ -81,13 +81,13 @@ public class MainViewModel extends AndroidViewModel {
 
     public void searchGames(String query) {
         searchQuery.setValue(query);
-
         if (query == null || query.trim().isEmpty()) {
             loadGamesWithFilters();
             return;
         }
 
-        if (useFuzzySearch.getValue() != null && useFuzzySearch.getValue()) {
+        Boolean useFuzzy = useFuzzySearch.getValue();
+        if (useFuzzy != null && useFuzzy) {
             repository.searchGamesFuzzy(query);
         } else {
             repository.searchGamesExact(query);
@@ -114,8 +114,24 @@ public class MainViewModel extends AndroidViewModel {
         repository.updateGame(game);
     }
 
+    // Исправленный метод deleteGame
     public void deleteGame(GameEntity game) {
-        repository.deleteGame(game);
+        repository.deleteGame(game, new GameRepository.OnDeleteListener() {
+            @Override
+            public void onSuccess() {
+                // Игра успешно удалена
+            }
+
+            @Override
+            public void onError(String error) {
+                // Ошибка при удалении
+            }
+        });
+    }
+
+    // Альтернативный метод с callback
+    public void deleteGame(GameEntity game, GameRepository.OnDeleteListener listener) {
+        repository.deleteGame(game, listener);
     }
 
     public void refreshData() {
@@ -126,12 +142,10 @@ public class MainViewModel extends AndroidViewModel {
     public void updateSortSettings(String sortBy, String sortOrder) {
         preferencesHelper.setSortBy(sortBy);
         preferencesHelper.setSortOrder(sortOrder);
+        repository.updateSortSettings(sortBy, sortOrder);
+    }
 
-        String query = searchQuery.getValue();
-        if (query != null && !query.isEmpty()) {
-            searchGames(query);
-        } else {
-            loadGamesWithFilters();
-        }
+    public void toggleFavorite(int gameId, boolean isFavorite, GameRepository.OnFavoriteToggledListener listener) {
+        repository.toggleFavorite(gameId, isFavorite, listener);
     }
 }

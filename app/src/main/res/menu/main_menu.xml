@@ -1,18 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
-
     <item
-        android:id="@+id/action_search"
-        android:title="@string/search"
-        android:icon="@android:drawable/ic_menu_search"
-        app:showAsAction="always|collapseActionView"
-        app:actionViewClass="androidx.appcompat.widget.SearchView" />
-
+        android:id="@+id/menu_settings"
+        android:title="@string/menu_settings"
+        app:showAsAction="never" />
     <item
-        android:id="@+id/action_sync"
-        android:title="@string/sync"
-        android:icon="@android:drawable/ic_menu_rotate"
-        app:showAsAction="ifRoom" />
-
+        android:id="@+id/menu_about"
+        android:title="@string/menu_about"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_logout"
+        android:title="Logout"
+        app:showAsAction="never" />
 </menu>

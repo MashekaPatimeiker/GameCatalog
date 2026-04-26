@@ -35,6 +35,9 @@ public class GameEntity {
     @ColumnInfo(name = "remote_id")
     private Long remoteId;
 
+    @ColumnInfo(name = "is_favorite", defaultValue = "0")
+    private boolean isFavorite;
+
     public GameEntity() {}
 
     @Ignore
@@ -45,6 +48,7 @@ public class GameEntity {
         this.description = description;
         this.imagePath = imagePath;
         this.isSynced = false;
+        this.isFavorite = false;
     }
 
     // Геттеры и сеттеры
@@ -74,4 +78,7 @@ public class GameEntity {
 
     public Long getRemoteId() { return remoteId; }
     public void setRemoteId(Long remoteId) { this.remoteId = remoteId; }
+
+    public boolean isFavorite() { return isFavorite; }
+    public void setFavorite(boolean favorite) { isFavorite = favorite; }
 }

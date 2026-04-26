@@ -28,7 +28,12 @@ public interface GameDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void insertAllGames(List<GameEntity> games);
+    @Query("SELECT * FROM games WHERE remote_id = :remoteId")
+    GameEntity getGameByRemoteId(Long remoteId);
 
+
+    @Query("UPDATE games SET is_favorite = :isFavorite WHERE id = :gameId")
+    void updateFavoriteStatus(int gameId, boolean isFavorite);
     @Update
     int updateGame(GameEntity game);
 

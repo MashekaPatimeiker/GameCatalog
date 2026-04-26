@@ -43,7 +43,7 @@ public class RemoteGameRepository {
             callback.onFailure(null, new Exception("No internet"));
             return;
         }
-        api.getGames(search, genre, sortBy, sortOrder).enqueue(callback);
+        api.getGames("games", sortBy, sortOrder).enqueue(callback);
     }
 
     public void syncAllGames(String search, String genre, String sortBy, String sortOrder) {
@@ -51,7 +51,7 @@ public class RemoteGameRepository {
             Log.d(TAG, "No network, skip sync");
             return;
         }
-        api.getGames(search, genre, sortBy, sortOrder).enqueue(new Callback<List<GameDto>>() {
+        api.getGames("games", sortBy, sortOrder).enqueue(new Callback<List<GameDto>>() {
             @Override
             public void onResponse(Call<List<GameDto>> call, Response<List<GameDto>> response) {
                 if (response.isSuccessful() && response.body() != null) {

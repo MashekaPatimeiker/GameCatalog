@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.ImageView;
+import android.util.Log;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,14 +15,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class ImageLoader {
-
     private static final String TAG = "ImageLoader";
     private static ImageLoader instance;
     private ExecutorService executorService;
     private Handler mainHandler;
 
     private ImageLoader() {
-        this.executorService = Executors.newFixedThreadPool(3);
+        this.executorService = Executors.newFixedThreadPool(4);
         this.mainHandler = new Handler(Looper.getMainLooper());
     }
 
@@ -33,41 +33,78 @@ public class ImageLoader {
     }
 
     public void loadImage(String url, ImageView imageView, int placeholderResId) {
-        imageView.setImageResource(placeholderResId);
-
         if (url == null || url.isEmpty()) {
+            imageView.setImageResource(placeholderResId);
             return;
         }
 
+        // Устанавливаем заглушку сразу
+        imageView.setImageResource(placeholderResId);
+
         executorService.execute(() -> {
             try {
-                Bitmap bitmap = downloadImage(url);
+                // Проверяем, что URL начинается с http
+                String imageUrl = url;
+                if (!url.startsWith("http")) {
+                    // Если это локальный путь, пробуем загрузить из файла
+                    loadImageFromFile(imageUrl, imageView, placeholderResId);
+                    return;
+                }
+
+                Bitmap bitmap = downloadImage(imageUrl);
                 if (bitmap != null) {
                     mainHandler.post(() -> imageView.setImageBitmap(bitmap));
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                Log.e(TAG, "Error loading image: " + e.getMessage());
             }
         });
     }
 
-    private Bitmap downloadImage(String imageUrl) throws IOException {
-        URL url = new URL(imageUrl);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setDoInput(true);
-        connection.setConnectTimeout(5000);
-        connection.setReadTimeout(5000);
-        connection.connect();
-
-        if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
-            return null;
+    private void loadImageFromFile(String path, ImageView imageView, int placeholderResId) {
+        try {
+            java.io.File file = new java.io.File(path);
+            if (file.exists()) {
+                Bitmap bitmap = BitmapFactory.decodeFile(path);
+                if (bitmap != null) {
+                    mainHandler.post(() -> imageView.setImageBitmap(bitmap));
+                    return;
+                }
+            }
+            mainHandler.post(() -> imageView.setImageResource(placeholderResId));
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading from file: " + e.getMessage());
+            mainHandler.post(() -> imageView.setImageResource(placeholderResId));
         }
+    }
 
-        InputStream input = connection.getInputStream();
-        Bitmap bitmap = BitmapFactory.decodeStream(input);
-        input.close();
-        connection.disconnect();
+    private Bitmap downloadImage(String imageUrl) throws IOException {
+        HttpURLConnection connection = null;
+        try {
+            URL url = new URL(imageUrl);
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setDoInput(true);
+            connection.setConnectTimeout(10000);
+            connection.setReadTimeout(10000);
+            connection.connect();
 
-        return bitmap;
+            if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
+                Log.e(TAG, "Server returned HTTP " + connection.getResponseCode());
+                return null;
+            }
+
+            InputStream input = connection.getInputStream();
+            Bitmap bitmap = BitmapFactory.decodeStream(input);
+            input.close();
+            return bitmap;
+
+        } catch (Exception e) {
+            Log.e(TAG, "Download error: " + e.getMessage());
+            return null;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
     }
 }

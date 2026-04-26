@@ -11,12 +11,11 @@ import retrofit2.http.*;
 
 public interface RemoteGameApi {
 
-    @GET("api/games")
+    @GET("/")
     Call<List<GameDto>> getGames(
-            @Query("search") String search,
-            @Query("genre") String genre,
+            @Query("action") String action,
             @Query("sortBy") String sortBy,
-            @Query("sortOrder") String sortOrder
+            @Query("sortOrder") String sortOrde
     );
 
     @GET("api/games/{id}")
