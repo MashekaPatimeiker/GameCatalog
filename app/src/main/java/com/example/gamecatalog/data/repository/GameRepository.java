@@ -67,7 +67,26 @@ public class GameRepository {
         this.loadingLiveData = new MutableLiveData<>(false);
         this.isOfflineLiveData = new MutableLiveData<>(false);
 
+        // Добавляем тестовые игры если БД пуста
+        executorService.execute(() -> {
+            if (database.gameDao().getGamesCount() == 0) {
+                insertSampleGames();
+            }
+        });
+
         loadLocalGames();
+    }
+
+    private void insertSampleGames() {
+        List<GameEntity> games = new ArrayList<>();
+        games.add(new GameEntity("The Legend of Zelda", "Adventure", "2023-05-12", "Epic adventure game", "https://picsum.photos/id/104/200/300"));
+        games.add(new GameEntity("Super Mario Odyssey", "Platformer", "2023-11-17", "Classic platformer", "https://picsum.photos/id/106/200/300"));
+        games.add(new GameEntity("Elden Ring", "RPG", "2022-02-25", "Action RPG masterpiece", "https://picsum.photos/id/107/200/300"));
+        games.add(new GameEntity("God of War", "Action", "2022-11-09", "Epic Norse adventure", "https://picsum.photos/id/104/200/300"));
+        games.add(new GameEntity("Cyberpunk 2077", "RPG", "2020-12-10", "Open world cyberpunk", "https://picsum.photos/id/106/200/300"));
+
+        database.gameDao().insertAllGames(games);
+        Log.d(TAG, "Inserted " + games.size() + " sample games");
     }
 
     public static synchronized GameRepository getInstance(Context context) {
@@ -351,12 +370,18 @@ public class GameRepository {
         });
     }
 
+    // Метод удаления игры
     public void deleteGame(GameEntity game) {
         executorService.execute(() -> {
             try {
-
-                // Затем удаляем игру
+                // Удаляем из локальной БД
                 database.gameDao().deleteGame(game);
+
+                // Пытаемся удалить с сервера
+                String token = preferencesHelper.getAuthToken();
+                if (token != null && game.getRemoteId() != null) {
+                    deleteFromServer(game.getRemoteId().intValue(), token);
+                }
 
                 // Обновляем UI
                 loadLocalGames();
@@ -369,15 +394,17 @@ public class GameRepository {
             }
         });
     }
-    private void deleteGameFromServer(int gameId, String token) {
+
+    private void deleteFromServer(int gameId, String token) {
         try {
+            OkHttpClient client = new OkHttpClient();
             Request request = new Request.Builder()
                     .url("http://10.0.2.2:8080/?action=games&id=" + gameId)
                     .addHeader("Authorization", "Bearer " + token)
                     .delete()
                     .build();
 
-            okHttpClient.newCall(request).enqueue(new okhttp3.Callback() {
+            client.newCall(request).enqueue(new okhttp3.Callback() {
                 @Override
                 public void onFailure(okhttp3.Call call, IOException e) {
                     Log.e(TAG, "Failed to delete from server: " + e.getMessage());
@@ -389,7 +416,7 @@ public class GameRepository {
                 }
             });
         } catch (Exception e) {
-            Log.e(TAG, "Error deleting from server: " + e.getMessage());
+            Log.e(TAG, "Error: " + e.getMessage());
         }
     }
     // Синхронизация избранного с сервером
