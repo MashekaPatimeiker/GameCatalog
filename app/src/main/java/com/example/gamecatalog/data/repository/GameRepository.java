@@ -754,8 +754,9 @@ public class GameRepository {
         void onError(String error);
     }
     public void updateSortSettings(String sortBy, String sortOrder) {
-        preferencesHelper.setSortBy(sortBy);
-        preferencesHelper.setSortOrder(sortOrder);
+        //preferencesHelper.setSortBy(sortBy);
+        //preferencesHelper.setSortOrder(sortOrder);
+        Log.d(TAG, "Using local database only");
         loadGamesSorted(sortBy, sortOrder);
     }
 
