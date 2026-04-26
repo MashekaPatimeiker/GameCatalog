@@ -4,8 +4,8 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Handler;
 import android.os.Looper;
-import android.widget.ImageView;
 import android.util.Log;
+import android.widget.ImageView;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,20 +38,11 @@ public class ImageLoader {
             return;
         }
 
-        // Устанавливаем заглушку сразу
         imageView.setImageResource(placeholderResId);
 
         executorService.execute(() -> {
             try {
-                // Проверяем, что URL начинается с http
-                String imageUrl = url;
-                if (!url.startsWith("http")) {
-                    // Если это локальный путь, пробуем загрузить из файла
-                    loadImageFromFile(imageUrl, imageView, placeholderResId);
-                    return;
-                }
-
-                Bitmap bitmap = downloadImage(imageUrl);
+                Bitmap bitmap = downloadImage(url);
                 if (bitmap != null) {
                     mainHandler.post(() -> imageView.setImageBitmap(bitmap));
                 }
@@ -61,31 +52,17 @@ public class ImageLoader {
         });
     }
 
-    private void loadImageFromFile(String path, ImageView imageView, int placeholderResId) {
-        try {
-            java.io.File file = new java.io.File(path);
-            if (file.exists()) {
-                Bitmap bitmap = BitmapFactory.decodeFile(path);
-                if (bitmap != null) {
-                    mainHandler.post(() -> imageView.setImageBitmap(bitmap));
-                    return;
-                }
-            }
-            mainHandler.post(() -> imageView.setImageResource(placeholderResId));
-        } catch (Exception e) {
-            Log.e(TAG, "Error loading from file: " + e.getMessage());
-            mainHandler.post(() -> imageView.setImageResource(placeholderResId));
-        }
-    }
-
-    private Bitmap downloadImage(String imageUrl) throws IOException {
+    private Bitmap downloadImage(String imageUrl) {
         HttpURLConnection connection = null;
+        InputStream input = null;
+
         try {
             URL url = new URL(imageUrl);
             connection = (HttpURLConnection) url.openConnection();
             connection.setDoInput(true);
             connection.setConnectTimeout(10000);
             connection.setReadTimeout(10000);
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0");
             connection.connect();
 
             if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
@@ -93,18 +70,17 @@ public class ImageLoader {
                 return null;
             }
 
-            InputStream input = connection.getInputStream();
-            Bitmap bitmap = BitmapFactory.decodeStream(input);
-            input.close();
-            return bitmap;
+            input = connection.getInputStream();
+            return BitmapFactory.decodeStream(input);
 
-        } catch (Exception e) {
-            Log.e(TAG, "Download error: " + e.getMessage());
+        } catch (IOException e) {
+            Log.e(TAG, "Download failed: " + e.getMessage());
             return null;
         } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
+            try {
+                if (input != null) input.close();
+                if (connection != null) connection.disconnect();
+            } catch (IOException e) { }
         }
     }
 }

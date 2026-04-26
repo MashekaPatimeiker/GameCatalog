@@ -133,133 +133,188 @@ case 'login':
     }
     break;
 
-    case 'games':
-        if ($method === 'GET') {
-            $search = isset($_GET['search']) ? $_GET['search'] : '';
-            $genre = isset($_GET['genre']) ? $_GET['genre'] : '';
-            $sortBy = isset($_GET['sortBy']) ? $_GET['sortBy'] : 'title';
-            $sortOrder = isset($_GET['sortOrder']) ? $_GET['sortOrder'] : 'ASC';
-
-            $sql = "SELECT id, title, genre, release_date, description, image_path, is_synced FROM games";
-            $where = [];
-            $params = [];
-
-            if (!empty($search)) {
-                $where[] = "title ILIKE ?";
-                $params[] = "%$search%";
-            }
-
-            if (!empty($genre) && $genre !== 'All') {
-                $where[] = "genre ILIKE ?";
-                $params[] = "%$genre%";
-            }
-
-            if (!empty($where)) {
-                $sql .= " WHERE " . implode(" AND ", $where);
-            }
-
-            $allowedSort = ['title', 'genre', 'release_date'];
-            $sortBy = in_array($sortBy, $allowedSort) ? $sortBy : 'title';
-            $sortOrder = strtoupper($sortOrder) === 'DESC' ? 'DESC' : 'ASC';
-
-            $sql .= " ORDER BY $sortBy $sortOrder";
-
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($params);
-            $games = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            // Return as array directly (not wrapped in success/data)
-            echo json_encode($games);
-
-        } elseif ($method === 'POST') {
-            if (!$input) {
-                http_response_code(400);
-                echo json_encode(['error' => 'Invalid input']);
-                break;
-            }
-
-            $stmt = $pdo->prepare("INSERT INTO games (title, genre, release_date, description, image_path, user_id, is_synced) VALUES (?, ?, ?, ?, ?, ?, true) RETURNING id");
-            $stmt->execute([
-                $input['title'] ?? '',
-                $input['genre'] ?? '',
-                $input['release_date'] ?? '',
-                $input['description'] ?? '',
-                $input['image_path'] ?? '',
-                $userId
-            ]);
-            $result = $stmt->fetch();
-            echo json_encode(['success' => true, 'id' => $result['id']]);
-
-        } elseif ($method === 'PUT') {
-            $gameId = isset($_GET['id']) ? (int)$_GET['id'] : null;
-            if (!$gameId) {
-                echo json_encode(['error' => 'Game ID required']);
-                break;
-            }
-
-            $stmt = $pdo->prepare("UPDATE games SET title = ?, genre = ?, release_date = ?, description = ?, image_path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? RETURNING id");
-            $stmt->execute([
-                $input['title'] ?? '',
-                $input['genre'] ?? '',
-                $input['release_date'] ?? '',
-                $input['description'] ?? '',
-                $input['image_path'] ?? '',
-                $gameId
-            ]);
-
-            if ($stmt->fetch()) {
-                echo json_encode(['success' => true]);
-            } else {
-                echo json_encode(['error' => 'Game not found']);
-            }
-
-        } elseif ($method === 'DELETE') {
-            $gameId = isset($_GET['id']) ? (int)$_GET['id'] : null;
-            if (!$gameId) {
-                echo json_encode(['error' => 'Game ID required']);
-                break;
-            }
-
-            $stmt = $pdo->prepare("DELETE FROM games WHERE id = ?");
-            $stmt->execute([$gameId]);
-            echo json_encode(['success' => true, 'deleted' => $stmt->rowCount()]);
+case 'games':
+    if ($method === 'GET') {
+        // Проверяем авторизацию
+        $userId = getUserId($pdo);
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Unauthorized']);
+            break;
         }
+
+        $search = isset($_GET['search']) ? $_GET['search'] : '';
+        $genre = isset($_GET['genre']) ? $_GET['genre'] : '';
+        $sortBy = isset($_GET['sortBy']) ? $_GET['sortBy'] : 'title';
+        $sortOrder = isset($_GET['sortOrder']) ? $_GET['sortOrder'] : 'ASC';
+
+        // ВАЖНО: Добавляем фильтр по user_id
+        $sql = "SELECT id, title, genre, release_date, description, image_path, is_favorite
+                FROM games
+                WHERE user_id = :user_id";
+        $params = [':user_id' => $userId];
+
+        if (!empty($search)) {
+            $sql .= " AND title ILIKE :search";
+            $params[':search'] = "%$search%";
+        }
+
+        if (!empty($genre) && $genre !== 'All') {
+            $sql .= " AND genre ILIKE :genre";
+            $params[':genre'] = "%$genre%";
+        }
+
+        $allowedSort = ['title', 'genre', 'release_date'];
+        $sortBy = in_array($sortBy, $allowedSort) ? $sortBy : 'title';
+        $sortOrder = strtoupper($sortOrder) === 'DESC' ? 'DESC' : 'ASC';
+        $sql .= " ORDER BY $sortBy $sortOrder";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $games = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode($games);
+
+    } elseif ($method === 'POST') {
+        // Создание игры - привязываем к текущему пользователю
+        $userId = getUserId($pdo);
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Unauthorized']);
+            break;
+        }
+
+        if (!$input) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid input']);
+            break;
+        }
+
+        $stmt = $pdo->prepare("INSERT INTO games (title, genre, release_date, description, image_path, user_id, is_synced)
+                               VALUES (?, ?, ?, ?, ?, ?, true) RETURNING id");
+        $stmt->execute([
+            $input['title'] ?? '',
+            $input['genre'] ?? '',
+            $input['release_date'] ?? '',
+            $input['description'] ?? '',
+            $input['image_path'] ?? '',
+            $userId
+        ]);
+        $result = $stmt->fetch();
+        echo json_encode(['success' => true, 'id' => $result['id']]);
+
+    } elseif ($method === 'PUT') {
+        // Обновление игры - проверяем, что игра принадлежит пользователю
+        $userId = getUserId($pdo);
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Unauthorized']);
+            break;
+        }
+
+        $gameId = isset($_GET['id']) ? (int)$_GET['id'] : null;
+        if (!$gameId) {
+            echo json_encode(['error' => 'Game ID required']);
+            break;
+        }
+
+        // Проверяем, что игра принадлежит пользователю
+        $stmt = $pdo->prepare("SELECT id FROM games WHERE id = ? AND user_id = ?");
+        $stmt->execute([$gameId, $userId]);
+        if (!$stmt->fetch()) {
+            echo json_encode(['error' => 'Game not found or access denied']);
+            break;
+        }
+
+        $stmt = $pdo->prepare("UPDATE games SET title = ?, genre = ?, release_date = ?, description = ?, image_path = ?, updated_at = CURRENT_TIMESTAMP
+                               WHERE id = ? AND user_id = ? RETURNING id");
+        $stmt->execute([
+            $input['title'] ?? '',
+            $input['genre'] ?? '',
+            $input['release_date'] ?? '',
+            $input['description'] ?? '',
+            $input['image_path'] ?? '',
+            $gameId,
+            $userId
+        ]);
+
+        if ($stmt->fetch()) {
+            echo json_encode(['success' => true]);
+        } else {
+            echo json_encode(['error' => 'Game not found']);
+        }
+
+    } elseif ($method === 'DELETE') {
+        // Удаление игры - проверяем, что игра принадлежит пользователю
+        $userId = getUserId($pdo);
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Unauthorized']);
+            break;
+        }
+
+        $gameId = isset($_GET['id']) ? (int)$_GET['id'] : null;
+        if (!$gameId) {
+            echo json_encode(['error' => 'Game ID required']);
+            break;
+        }
+
+        $stmt = $pdo->prepare("DELETE FROM games WHERE id = ? AND user_id = ?");
+        $stmt->execute([$gameId, $userId]);
+        echo json_encode(['success' => true, 'deleted' => $stmt->rowCount()]);
+    }
+    break;
+case 'favorites':
+    $userId = getUserId($pdo);
+    if (!$userId) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Unauthorized']);
         break;
+    }
 
-    case 'favorites':
-        if ($method === 'GET') {
-            $stmt = $pdo->prepare("SELECT g.* FROM favorites f JOIN games g ON f.game_id = g.id WHERE f.user_id = ?");
-            $stmt->execute([$userId]);
-            echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+    if ($method === 'GET') {
+        // Получить избранные игры пользователя
+        $stmt = $pdo->prepare("SELECT g.* FROM games g
+                               JOIN favorites f ON g.id = f.game_id
+                               WHERE f.user_id = ?");
+        $stmt->execute([$userId]);
+        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
 
-        } elseif ($method === 'POST') {
-            $gameId = $input['game_id'] ?? null;
-            if (!$gameId) {
-                echo json_encode(['error' => 'Game ID required']);
-                break;
-            }
+    } elseif ($method === 'POST') {
+        // Добавить в избранное
+        $gameId = $input['game_id'] ?? null;
+        if (!$gameId) {
+            echo json_encode(['error' => 'Game ID required']);
+            break;
+        }
 
-            try {
-                $stmt = $pdo->prepare("INSERT INTO favorites (user_id, game_id) VALUES (?, ?)");
-                $stmt->execute([$userId, $gameId]);
-                echo json_encode(['success' => true]);
-            } catch (PDOException $e) {
-                echo json_encode(['success' => false, 'error' => 'Already in favorites']);
-            }
-
-        } elseif ($method === 'DELETE') {
-            $gameId = isset($_GET['game_id']) ? (int)$_GET['game_id'] : null;
-            if (!$gameId) {
-                echo json_encode(['error' => 'Game ID required']);
-                break;
-            }
-
-            $stmt = $pdo->prepare("DELETE FROM favorites WHERE user_id = ? AND game_id = ?");
+        try {
+            $stmt = $pdo->prepare("INSERT INTO favorites (user_id, game_id) VALUES (?, ?)");
             $stmt->execute([$userId, $gameId]);
-            echo json_encode(['success' => true, 'deleted' => $stmt->rowCount()]);
+            // Также обновляем is_favorite в таблице games
+            $stmt = $pdo->prepare("UPDATE games SET is_favorite = true WHERE id = ?");
+            $stmt->execute([$gameId]);
+            echo json_encode(['success' => true]);
+        } catch (PDOException $e) {
+            echo json_encode(['success' => false, 'error' => 'Already in favorites']);
         }
-        break;
 
+    } elseif ($method === 'DELETE') {
+        // Удалить из избранного
+        $gameId = isset($_GET['game_id']) ? (int)$_GET['game_id'] : null;
+        if (!$gameId) {
+            echo json_encode(['error' => 'Game ID required']);
+            break;
+        }
+
+        $stmt = $pdo->prepare("DELETE FROM favorites WHERE user_id = ? AND game_id = ?");
+        $stmt->execute([$userId, $gameId]);
+        // Обновляем is_favorite в таблице games
+        $stmt = $pdo->prepare("UPDATE games SET is_favorite = false WHERE id = ?");
+        $stmt->execute([$gameId]);
+        echo json_encode(['success' => true, 'deleted' => $stmt->rowCount()]);
+    }
+    break;
     default:
         // Default response for root endpoint
         echo json_encode([

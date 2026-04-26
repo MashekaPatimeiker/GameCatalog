@@ -58,22 +58,11 @@ public class GameDetailViewModel extends AndroidViewModel {
         }
     }
 
-    // Исправленный метод deleteGame
     public void deleteGame() {
         if (isEditMode.getValue() != null && isEditMode.getValue()) {
             GameEntity current = currentGame.getValue();
             if (current != null) {
-                repository.deleteGame(current, new GameRepository.OnDeleteListener() {
-                    @Override
-                    public void onSuccess() {
-                        // Игра успешно удалена
-                    }
-
-                    @Override
-                    public void onError(String error) {
-                        // Ошибка при удалении
-                    }
-                });
+                repository.deleteGame(current);  // Только один параметр
             }
         }
     }

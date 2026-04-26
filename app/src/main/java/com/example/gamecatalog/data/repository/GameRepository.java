@@ -19,6 +19,7 @@ import com.google.gson.reflect.TypeToken;
 
 import org.json.JSONObject;
 
+import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -154,25 +155,81 @@ public class GameRepository {
     private void fetchGamesFromApiWithSort(String sortBy, String sortOrder) {
         loadingLiveData.postValue(true);
 
-        RemoteRetrofitClient.getInstance().getRemoteGameApi()
-                .getGames("games", sortBy, sortOrder)
-                .enqueue(new Callback<List<GameDto>>() {
-                    @Override
-                    public void onResponse(Call<List<GameDto>> call, Response<List<GameDto>> response) {
-                        loadingLiveData.postValue(false);
-                        if (response.isSuccessful() && response.body() != null) {
-                            saveGamesToDatabaseWithSort(response.body(), sortBy, sortOrder);
-                        } else {
+        String token = preferencesHelper.getAuthToken();
+        Log.d(TAG, "Token: " + (token != null ? "exists" : "null"));
+
+        if (token == null) {
+            loadingLiveData.postValue(false);
+            loadLocalGamesSorted(sortBy, sortOrder);
+            return;
+        }
+
+        try {
+            Request request = new Request.Builder()
+                    .url("http://10.0.2.2:8080/?action=games")
+                    .addHeader("Authorization", "Bearer " + token)
+                    .addHeader("Content-Type", "application/json")
+                    .get()
+                    .build();
+
+            okHttpClient.newCall(request).enqueue(new okhttp3.Callback() {
+                @Override
+                public void onFailure(okhttp3.Call call, IOException e) {
+                    Log.e(TAG, "API call failed: " + e.getMessage());
+                    loadingLiveData.postValue(false);
+                    loadLocalGamesSorted(sortBy, sortOrder);
+                }
+
+                @Override
+                public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
+                    String responseBody = response.body() != null ? response.body().string() : "";
+                    Log.d(TAG, "API Response code: " + response.code());
+                    Log.d(TAG, "API Response body: " + (responseBody.length() > 200 ? responseBody.substring(0, 200) : responseBody));
+
+                    loadingLiveData.postValue(false);
+
+                    if (response.isSuccessful()) {
+                        try {
+                            // Проверяем, что ответ начинается с '['
+                            if (responseBody.trim().startsWith("[")) {
+                                Gson gson = new Gson();
+                                Type type = new TypeToken<List<GameEntity>>(){}.getType();
+                                List<GameEntity> games = gson.fromJson(responseBody, type);
+                                saveGamesEntitiesToDatabase(games, sortBy, sortOrder);
+                            } else {
+                                Log.e(TAG, "Response is not a JSON array: " + responseBody);
+                                loadLocalGamesSorted(sortBy, sortOrder);
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error parsing games: " + e.getMessage());
                             loadLocalGamesSorted(sortBy, sortOrder);
                         }
-                    }
-
-                    @Override
-                    public void onFailure(Call<List<GameDto>> call, Throwable t) {
-                        loadingLiveData.postValue(false);
+                    } else {
+                        Log.e(TAG, "HTTP Error: " + response.code());
                         loadLocalGamesSorted(sortBy, sortOrder);
                     }
-                });
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Exception in fetchGamesFromApiWithSort: " + e.getMessage());
+            loadingLiveData.postValue(false);
+            loadLocalGamesSorted(sortBy, sortOrder);
+        }
+    }
+
+
+    private void saveGamesEntitiesToDatabase(List<GameEntity> games, String sortBy, String sortOrder) {
+        executorService.execute(() -> {
+            try {
+                database.gameDao().deleteAllGames();
+                database.gameDao().insertAllGames(games);
+                Log.d(TAG, "Saved " + games.size() + " games to database");
+                loadLocalGamesSorted(sortBy, sortOrder);
+            } catch (Exception e) {
+                Log.e(TAG, "Error saving games: " + e.getMessage(), e);
+                errorLiveData.postValue("Error saving games: " + e.getMessage());
+            }
+        });
     }
 
     private void saveGamesToDatabaseWithSort(List<GameDto> games, String sortBy, String sortOrder) {
@@ -294,68 +351,45 @@ public class GameRepository {
         });
     }
 
-    // Удаление игры (локально и на сервере)
-    public void deleteGame(GameEntity game, OnDeleteListener listener) {
+    public void deleteGame(GameEntity game) {
         executorService.execute(() -> {
             try {
-                // 1. Удаляем с сервера
-                deleteGameFromServer(game, new OnServerDeleteListener() {
-                    @Override
-                    public void onSuccess() {
-                        // 2. Удаляем из локальной БД
-                        database.gameDao().deleteGame(game);
-                        loadLocalGames();
-                        if (listener != null) listener.onSuccess();
-                    }
 
-                    @Override
-                    public void onError(String error) {
-                        // Если сервер не отвечает, всё равно удаляем локально
-                        database.gameDao().deleteGame(game);
-                        loadLocalGames();
-                        if (listener != null) listener.onError(error);
-                    }
-                });
+                // Затем удаляем игру
+                database.gameDao().deleteGame(game);
+
+                // Обновляем UI
+                loadLocalGames();
+
+                Log.d(TAG, "Game deleted: " + game.getTitle());
+
             } catch (Exception e) {
                 Log.e(TAG, "Error deleting game: " + e.getMessage());
-                if (listener != null) listener.onError(e.getMessage());
+                errorLiveData.postValue("Error deleting game: " + e.getMessage());
             }
         });
     }
-
-    // Удаление с сервера
-    private void deleteGameFromServer(GameEntity game, OnServerDeleteListener listener) {
-        String token = preferencesHelper.getAuthToken();
-        if (token == null) {
-            listener.onError("Not logged in");
-            return;
-        }
-
+    private void deleteGameFromServer(int gameId, String token) {
         try {
             Request request = new Request.Builder()
-                    .url("http://10.0.2.2:8080/?action=games&id=" + game.getId())
+                    .url("http://10.0.2.2:8080/?action=games&id=" + gameId)
                     .addHeader("Authorization", "Bearer " + token)
                     .delete()
                     .build();
 
             okHttpClient.newCall(request).enqueue(new okhttp3.Callback() {
                 @Override
-                public void onFailure(okhttp3.Call call, java.io.IOException e) {
-                    listener.onError(e.getMessage());
+                public void onFailure(okhttp3.Call call, IOException e) {
+                    Log.e(TAG, "Failed to delete from server: " + e.getMessage());
                 }
 
                 @Override
-                public void onResponse(okhttp3.Call call, okhttp3.Response response) throws java.io.IOException {
+                public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
                     response.close();
-                    if (response.isSuccessful()) {
-                        listener.onSuccess();
-                    } else {
-                        listener.onError("Server error: " + response.code());
-                    }
                 }
             });
         } catch (Exception e) {
-            listener.onError(e.getMessage());
+            Log.e(TAG, "Error deleting from server: " + e.getMessage());
         }
     }
     // Синхронизация избранного с сервером

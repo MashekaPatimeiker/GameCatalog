@@ -9,7 +9,7 @@ import androidx.room.RoomDatabase;
 import com.example.gamecatalog.data.database.entities.GameEntity;
 
 // Увеличьте версию с 2 на 3
-@Database(entities = {GameEntity.class}, version = 3, exportSchema = false)
+@Database(entities = {GameEntity.class}, version = 4, exportSchema = false)
 public abstract class GameDatabase extends RoomDatabase {
 
     private static volatile GameDatabase INSTANCE;

@@ -16,12 +16,12 @@ import java.util.List;
 
 public class MainViewModel extends AndroidViewModel {
 
-    private GameRepository repository;
-    private PreferencesHelper preferencesHelper;
-    private MutableLiveData<Boolean> isConnected = new MutableLiveData<>();
-    private MutableLiveData<String> searchQuery = new MutableLiveData<>("");
-    private MutableLiveData<String> selectedGenre = new MutableLiveData<>("");
-    private MutableLiveData<Boolean> useFuzzySearch = new MutableLiveData<>(true);
+    private final GameRepository repository;
+    private final PreferencesHelper preferencesHelper;
+    private final MutableLiveData<Boolean> isConnected = new MutableLiveData<>();
+    private final MutableLiveData<String> searchQuery = new MutableLiveData<>("");
+    private final MutableLiveData<String> selectedGenre = new MutableLiveData<>("");
+    private final MutableLiveData<Boolean> useFuzzySearch = new MutableLiveData<>(true);
 
     public MainViewModel(@NonNull Application application) {
         super(application);
@@ -44,14 +44,6 @@ public class MainViewModel extends AndroidViewModel {
 
     public LiveData<Boolean> getIsOffline() {
         return repository.getIsOffline();
-    }
-
-    public LiveData<Boolean> getIsConnected() {
-        return isConnected;
-    }
-
-    public LiveData<Boolean> getUseFuzzySearch() {
-        return useFuzzySearch;
     }
 
     public void checkNetworkStatus() {
@@ -114,24 +106,9 @@ public class MainViewModel extends AndroidViewModel {
         repository.updateGame(game);
     }
 
-    // Исправленный метод deleteGame
+    // Исправленный метод deleteGame - только один параметр
     public void deleteGame(GameEntity game) {
-        repository.deleteGame(game, new GameRepository.OnDeleteListener() {
-            @Override
-            public void onSuccess() {
-                // Игра успешно удалена
-            }
-
-            @Override
-            public void onError(String error) {
-                // Ошибка при удалении
-            }
-        });
-    }
-
-    // Альтернативный метод с callback
-    public void deleteGame(GameEntity game, GameRepository.OnDeleteListener listener) {
-        repository.deleteGame(game, listener);
+        repository.deleteGame(game);
     }
 
     public void refreshData() {
