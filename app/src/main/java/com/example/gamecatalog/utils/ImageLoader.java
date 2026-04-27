@@ -53,34 +53,22 @@ public class ImageLoader {
     }
 
     private Bitmap downloadImage(String imageUrl) {
-        HttpURLConnection connection = null;
-        InputStream input = null;
-
+        Log.d(TAG, "Downloading: " + imageUrl);
         try {
             URL url = new URL(imageUrl);
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setDoInput(true);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setConnectTimeout(10000);
             connection.setReadTimeout(10000);
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0");
-            connection.connect();
 
-            if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
-                Log.e(TAG, "Server returned HTTP " + connection.getResponseCode());
-                return null;
+            int responseCode = connection.getResponseCode();
+            Log.d(TAG, "Response code: " + responseCode);
+
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                return BitmapFactory.decodeStream(connection.getInputStream());
             }
-
-            input = connection.getInputStream();
-            return BitmapFactory.decodeStream(input);
-
-        } catch (IOException e) {
-            Log.e(TAG, "Download failed: " + e.getMessage());
-            return null;
-        } finally {
-            try {
-                if (input != null) input.close();
-                if (connection != null) connection.disconnect();
-            } catch (IOException e) { }
+        } catch (Exception e) {
+            Log.e(TAG, "Download failed: " + e.getMessage(), e);
         }
+        return null;
     }
 }

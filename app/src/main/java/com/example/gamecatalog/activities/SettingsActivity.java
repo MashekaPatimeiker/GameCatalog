@@ -42,10 +42,8 @@ public class SettingsActivity extends BaseActivity {
     }
 
     private void initViews() {
-        //    themeSwitch = findViewById(R.id.themeSwitch);
         btnTestIn10Seconds = findViewById(R.id.btnTestIn10Seconds);
         languageGroup = findViewById(R.id.languageGroup);
-        //switchNotifications = findViewById(R.id.switchNotifications);
         btnTestNotification = findViewById(R.id.btnTestNotification);
         timePicker = findViewById(R.id.timePicker);
 

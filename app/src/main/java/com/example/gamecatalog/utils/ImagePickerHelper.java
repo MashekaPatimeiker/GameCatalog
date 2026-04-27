@@ -2,9 +2,11 @@ package com.example.gamecatalog.utils;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.widget.Toast;
@@ -14,7 +16,9 @@ import androidx.core.content.FileProvider;
 import com.example.gamecatalog.R;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -100,15 +104,41 @@ public class ImagePickerHelper {
     }
 
     private String getPathFromUri(Uri uri) {
-        String[] projection = {MediaStore.Images.Media.DATA};
-        try (android.database.Cursor cursor = activity.getContentResolver().query(uri, projection, null, null, null)) {
-            if (cursor != null && cursor.moveToFirst()) {
-                int columnIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
-                return cursor.getString(columnIndex);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+                String imageFileName = "JPEG_" + timeStamp + ".jpg";
+                File storageDir = activity.getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+                File destFile = new File(storageDir, imageFileName);
+
+                InputStream inputStream = activity.getContentResolver().openInputStream(uri);
+                FileOutputStream outputStream = new FileOutputStream(destFile);
+
+                byte[] buffer = new byte[1024];
+                int length;
+                while ((length = inputStream.read(buffer)) > 0) {
+                    outputStream.write(buffer, 0, length);
+                }
+
+                outputStream.close();
+                inputStream.close();
+
+                return destFile.getAbsolutePath();
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+        } else {
+            String[] projection = {MediaStore.Images.Media.DATA};
+            try (Cursor cursor = activity.getContentResolver().query(uri, projection, null, null, null)) {
+                if (cursor != null && cursor.moveToFirst()) {
+                    int columnIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
+                    return cursor.getString(columnIndex);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return null;
         }
-        return null;
     }
 }

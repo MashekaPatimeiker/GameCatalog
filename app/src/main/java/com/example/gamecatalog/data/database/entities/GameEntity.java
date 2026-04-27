@@ -5,6 +5,8 @@ import androidx.room.Entity;
 import androidx.room.Ignore;
 import androidx.room.PrimaryKey;
 
+import com.google.gson.annotations.SerializedName;
+
 @Entity(tableName = "games")
 public class GameEntity {
 
@@ -35,9 +37,9 @@ public class GameEntity {
     @ColumnInfo(name = "remote_id")
     private Long remoteId;
 
+    @SerializedName("is_favorite")
     @ColumnInfo(name = "is_favorite", defaultValue = "0")
     private boolean isFavorite;
-
     public GameEntity() {}
 
     @Ignore

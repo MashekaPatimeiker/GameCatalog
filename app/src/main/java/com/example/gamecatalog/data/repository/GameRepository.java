@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -312,6 +313,14 @@ public class GameRepository {
     public void addGame(GameEntity game) {
         executorService.execute(() -> {
             try {
+                List<GameEntity> existingGames = database.gameDao().getAllGames();
+                for (GameEntity existing : existingGames) {
+                    if (existing.getTitle().equalsIgnoreCase(game.getTitle())) {
+                        errorLiveData.postValue("Game with this title already exists");
+                        return;
+                    }
+                }
+
                 long id = database.gameDao().insertGame(game);
                 game.setId((int) id);
                 sendGameToServer(game);
@@ -370,31 +379,65 @@ public class GameRepository {
         });
     }
 
-    // Метод удаления игры
     public void deleteGame(GameEntity game) {
         executorService.execute(() -> {
             try {
-                // Удаляем из локальной БД
-                database.gameDao().deleteGame(game);
+                Log.d(TAG, "Deleting game: " + game.getTitle() + ", ID: " + game.getId());
 
-                // Пытаемся удалить с сервера
                 String token = preferencesHelper.getAuthToken();
-                if (token != null && game.getRemoteId() != null) {
-                    deleteFromServer(game.getRemoteId().intValue(), token);
+                if (token != null) {
+                    int serverId = game.getRemoteId() != null ? game.getRemoteId().intValue() : game.getId();
+                    Log.d(TAG, "Server ID for deletion: " + serverId);
+                    boolean deletedFromServer = deleteFromServerSync(serverId, token);
+
+                    if (!deletedFromServer) {
+                        Log.e(TAG, "Failed to delete from server, will retry later");
+                        return;
+                    }
                 }
 
-                // Обновляем UI
+                database.gameDao().deleteGame(game);
+                Log.d(TAG, "Game deleted from local DB");
+
                 loadLocalGames();
 
-                Log.d(TAG, "Game deleted: " + game.getTitle());
-
             } catch (Exception e) {
-                Log.e(TAG, "Error deleting game: " + e.getMessage());
+                Log.e(TAG, "Error deleting game: " + e.getMessage(), e);
                 errorLiveData.postValue("Error deleting game: " + e.getMessage());
             }
         });
     }
 
+    private boolean deleteFromServerSync(int gameId, String token) {
+        try {
+            OkHttpClient client = new OkHttpClient.Builder()
+                    .connectTimeout(10, TimeUnit.SECONDS)
+                    .readTimeout(10, TimeUnit.SECONDS)
+                    .build();
+
+            Request request = new Request.Builder()
+                    .url("http://10.0.2.2:8080/?action=games&id=" + gameId)
+                    .addHeader("Authorization", "Bearer " + token)
+                    .delete()
+                    .build();
+
+            try (okhttp3.Response response = client.newCall(request).execute()) {
+                Log.d(TAG, "Delete response code: " + response.code());
+                String responseBody = response.body() != null ? response.body().string() : "";
+                Log.d(TAG, "Delete response body: " + responseBody);
+
+                if (response.isSuccessful()) {
+                    return true;
+                } else {
+                    Log.e(TAG, "Server returned error: " + response.code() + " - " + responseBody);
+                    return false;
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error deleting from server: " + e.getMessage(), e);
+            return false;
+        }
+    }
     private void deleteFromServer(int gameId, String token) {
         try {
             OkHttpClient client = new OkHttpClient();
@@ -419,7 +462,6 @@ public class GameRepository {
             Log.e(TAG, "Error: " + e.getMessage());
         }
     }
-    // Синхронизация избранного с сервером
     private void syncFavoriteWithServer(int gameId, boolean isFavorite, OnFavoriteToggledListener listener) {
         String token = preferencesHelper.getAuthToken();
         if (token == null) return;
@@ -462,7 +504,6 @@ public class GameRepository {
         }
     }
 
-    // Загрузка избранного с сервера
     public void loadFavoritesFromServer(OnFavoritesLoadedListener listener) {
         String token = preferencesHelper.getAuthToken();
         if (token == null) return;
@@ -489,7 +530,6 @@ public class GameRepository {
                             Type type = new TypeToken<List<GameDto>>(){}.getType();
                             List<GameDto> favorites = gson.fromJson(responseBody, type);
 
-                            // Обновляем локальный статус избранного
                             for (GameDto fav : favorites) {
                                 database.gameDao().updateFavoriteStatus(fav.getId().intValue(), true);
                             }
@@ -510,7 +550,6 @@ public class GameRepository {
         }
     }
 
-    // Интерфейсы для回调
     public interface OnDeleteListener {
         void onSuccess();
         void onError(String error);
@@ -613,7 +652,6 @@ public class GameRepository {
             }
         });
     }
-    // Поиск игр (основной метод, который выбирает тип поиска)
     public void searchGames(String query, boolean useFuzzySearch) {
         if (query == null || query.trim().isEmpty()) {
             loadGames();
@@ -627,7 +665,6 @@ public class GameRepository {
         }
     }
 
-    // Нечеткий поиск (с опечатками)
     public void searchGamesFuzzy(String query) {
         if (query == null || query.trim().isEmpty()) {
             loadGames();
@@ -639,7 +676,6 @@ public class GameRepository {
         searchGamesFuzzyLocal(trimmedQuery);
     }
 
-    // Точный поиск
     public void searchGamesExact(String query) {
         if (query == null || query.trim().isEmpty()) {
             loadGames();
@@ -651,7 +687,6 @@ public class GameRepository {
         searchGamesExactLocal(trimmedQuery);
     }
 
-    // Локальный нечеткий поиск
     private void searchGamesFuzzyLocal(String query) {
         executorService.execute(() -> {
             try {
@@ -705,7 +740,6 @@ public class GameRepository {
         });
     }
 
-    // Локальный точный поиск
     private void searchGamesExactLocal(String query) {
         executorService.execute(() -> {
             try {
@@ -735,7 +769,6 @@ public class GameRepository {
         });
     }
 
-    // Обновить избранное на сервере
     public void toggleFavorite(int gameId, boolean isFavorite, OnFavoriteToggledListener listener) {
         String token = preferencesHelper.getAuthToken();
         if (token == null) {
@@ -762,7 +795,6 @@ public class GameRepository {
 
                 try (okhttp3.Response response = okHttpClient.newCall(request).execute()) {
                     if (response.isSuccessful()) {
-                        // Обновляем локальный статус избранного
                         database.gameDao().updateFavoriteStatus(gameId, isFavorite);
                         if (listener != null) listener.onSuccess();
                     } else {
@@ -781,8 +813,6 @@ public class GameRepository {
         void onError(String error);
     }
     public void updateSortSettings(String sortBy, String sortOrder) {
-        //preferencesHelper.setSortBy(sortBy);
-        //preferencesHelper.setSortOrder(sortOrder);
         Log.d(TAG, "Using local database only");
         loadGamesSorted(sortBy, sortOrder);
     }

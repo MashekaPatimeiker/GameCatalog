@@ -187,6 +187,13 @@ public class MainActivity extends BaseActivity {
 
         viewModel.getGames().observe(this, games -> {
             if (games != null) {
+                favoriteIds.clear();
+                for (GameEntity game : games) {
+                    if (game.isFavorite()) {
+                        favoriteIds.add(game.getId());
+                    }
+                }
+                adapter.setFavoriteIds(favoriteIds);
                 adapter.updateGames(games);
                 showEmptyState(games.isEmpty());
             }

@@ -11,11 +11,8 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.bumptech.glide.Glide;
 import com.example.gamecatalog.R;
 import com.example.gamecatalog.data.database.entities.GameEntity;
-import com.example.gamecatalog.utils.ImageLoader;
-import com.example.gamecatalog.utils.ImageManager;
 import com.example.gamecatalog.utils.SocialShareHelper;
 
 import java.util.ArrayList;
@@ -27,9 +24,18 @@ public class GameAdapter extends RecyclerView.Adapter<GameAdapter.ViewHolder> {
 
     private final List<GameEntity> games = new ArrayList<>();
     private final OnItemClickListener listener;
-    private final ImageLoader imageLoader;
     private final Context context;
     private final Set<Integer> favoriteIds = new HashSet<>();
+
+    private final int[] gameImages = {
+            R.drawable.game_img_1,
+            R.drawable.game_img_2,
+            R.drawable.game_img_3,
+            R.drawable.game_img_4,
+            R.drawable.game_img_1,
+            R.drawable.game_img_2,
+            R.drawable.game_img_3
+    };
 
     public interface OnItemClickListener {
         void onItemClick(GameEntity game);
@@ -40,7 +46,6 @@ public class GameAdapter extends RecyclerView.Adapter<GameAdapter.ViewHolder> {
 
     public GameAdapter(OnItemClickListener listener, Context context) {
         this.listener = listener;
-        this.imageLoader = ImageLoader.getInstance();
         this.context = context;
     }
 
@@ -59,27 +64,28 @@ public class GameAdapter extends RecyclerView.Adapter<GameAdapter.ViewHolder> {
         holder.genreText.setText(game.getGenre());
         holder.dateText.setText(game.getReleaseDate());
 
-        // Загрузка изображения с обработкой ошибок
-        String imagePath = game.getImagePath();
-        if (imagePath != null && !imagePath.isEmpty()) {
-            if (imagePath.startsWith("http")) {
-                Glide.with(context)
-                        .load(imagePath)
-                        .placeholder(R.drawable.ic_game_placeholder)
-                        .error(R.drawable.ic_game_placeholder)
-                        .into(holder.ivThumbnail);
-            } else {
-                ImageManager.loadImageOptimized(imagePath, holder.ivThumbnail);
-            }
-        } else {
-            holder.ivThumbnail.setImageResource(R.drawable.ic_game_placeholder);
-        }
+        int imageIndex = position % gameImages.length;
+        holder.ivThumbnail.setImageResource(gameImages[imageIndex]);
 
-        // Устанавливаем иконку избранного
         boolean isFavorite = favoriteIds.contains(game.getId());
         holder.btnFavorite.setImageResource(isFavorite ? R.drawable.ic_favorite_filled : R.drawable.ic_favorite_border);
 
-        // Обработчики кликов
+        holder.btnFavorite.setOnClickListener(v -> {
+            boolean newFavoriteState = !favoriteIds.contains(game.getId());
+
+            holder.btnFavorite.setImageResource(newFavoriteState ? R.drawable.ic_favorite_filled : R.drawable.ic_favorite_border);
+
+            if (newFavoriteState) {
+                favoriteIds.add(game.getId());
+            } else {
+                favoriteIds.remove(game.getId());
+            }
+
+            if (listener != null) {
+                listener.onFavoriteClick(game, newFavoriteState);
+            }
+        });
+
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) {
                 listener.onItemClick(game);
@@ -93,18 +99,11 @@ public class GameAdapter extends RecyclerView.Adapter<GameAdapter.ViewHolder> {
             return true;
         });
 
-        holder.btnFavorite.setOnClickListener(v -> {
-            boolean newFavoriteState = !favoriteIds.contains(game.getId());
-            if (listener != null) {
-                listener.onFavoriteClick(game, newFavoriteState);
-            }
-        });
-
         holder.btnShare.setOnClickListener(v -> {
             if (listener != null) {
                 listener.onShareClick(game);
             } else {
-                SocialShareHelper.shareGame(context, game, game.getImagePath());
+                SocialShareHelper.shareGame(context, game, null);
             }
         });
     }
@@ -128,7 +127,6 @@ public class GameAdapter extends RecyclerView.Adapter<GameAdapter.ViewHolder> {
         } else {
             favoriteIds.remove(gameId);
         }
-        // Обновляем только конкретный элемент
         int position = findPositionById(gameId);
         if (position != -1) {
             notifyItemChanged(position);

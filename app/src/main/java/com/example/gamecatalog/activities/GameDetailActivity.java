@@ -18,6 +18,7 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.example.gamecatalog.R;
 import com.example.gamecatalog.data.database.entities.GameEntity;
+import com.example.gamecatalog.utils.GlideLoader;
 import com.example.gamecatalog.utils.ImageLoader;
 import com.example.gamecatalog.utils.ImageManager;
 import com.example.gamecatalog.utils.ImagePickerHelper;
@@ -95,19 +96,6 @@ public class GameDetailActivity extends BaseActivity {
         });
     }
 
-    private void loadImageIntoView(String imagePath) {
-        if (imagePath == null || imagePath.isEmpty()) {
-            ivGameImage.setImageResource(R.drawable.ic_game_placeholder);
-            return;
-        }
-
-        if (imagePath.startsWith("http")) {
-            ImageLoader.getInstance().loadImage(imagePath, ivGameImage, R.drawable.ic_game_placeholder);
-        } else {
-            ImageManager.loadImageOptimized(imagePath, ivGameImage);
-        }
-    }
-
     private void setupButtons() {
         btnSave.setOnClickListener(v -> saveGame());
         btnDelete.setOnClickListener(v -> deleteGame());
@@ -177,7 +165,7 @@ public class GameDetailActivity extends BaseActivity {
             return;
         }
 
-        viewModel.saveGame(title, genre, date, description, currentImagePath);
+        viewModel.saveGame(title, genre, date, description, currentImagePath != null ? currentImagePath : "");
 
         Toast.makeText(this,
                 gameId == -1 ? R.string.game_added : R.string.game_updated,
@@ -186,6 +174,18 @@ public class GameDetailActivity extends BaseActivity {
         finish();
     }
 
+    private void loadImageIntoView(String imagePath) {
+        if (imagePath == null || imagePath.isEmpty()) {
+            ivGameImage.setImageResource(R.drawable.ic_game_placeholder);
+            return;
+        }
+
+        if (imagePath.startsWith("http")) {
+            GlideLoader.loadImage(this, imagePath, ivGameImage);
+        } else {
+            ImageManager.loadImageOptimized(imagePath, ivGameImage);
+        }
+    }
     private void deleteGame() {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.delete_game_title)
