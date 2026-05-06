@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -33,6 +34,7 @@ import com.example.gamecatalog.data.database.entities.GameEntity;
 import com.example.gamecatalog.data.repository.GameRepository;
 import com.example.gamecatalog.utils.GeolocationManager;
 import com.example.gamecatalog.utils.PreferencesHelper;
+import com.example.gamecatalog.utils.RealtimeSubscription;
 import com.example.gamecatalog.utils.SocialShareHelper;
 import com.example.gamecatalog.viewmodel.MainViewModel;
 
@@ -51,7 +53,7 @@ public class MainActivity extends BaseActivity {
     private SearchView searchView;
     private Spinner spinnerGenre;
     private SwitchCompat switchFuzzySearch;
-
+    private RealtimeSubscription realtimeSubscription;
     private MainViewModel viewModel;
     private PreferencesHelper preferencesHelper;
     private GeolocationManager geolocationManager;
@@ -75,7 +77,7 @@ public class MainActivity extends BaseActivity {
         setupSwipeRefresh();
         setupSearchAndFilter();
         setupLocation();
-
+        setupRealtimeSubscription();
         viewModel.loadGames();
     }
 
@@ -103,7 +105,41 @@ public class MainActivity extends BaseActivity {
             }
         });
     }
+    private void setupRealtimeSubscription() {
+        realtimeSubscription = RealtimeSubscription.getInstance();
+        realtimeSubscription.subscribe(new RealtimeSubscription.OnDatabaseChangeListener() {
+            @Override
+            public void onGameChanged(String operation, int gameId) {
+                Log.d("MainActivity", "🔄 БД изменилась! Операция: " + operation + ", игра: " + gameId);
 
+                runOnUiThread(() -> {
+                    Toast.makeText(MainActivity.this,
+                            "База данных изменена! Обновление...",
+                            Toast.LENGTH_SHORT).show();
+                });
+
+                viewModel.refreshData();
+            }
+
+            @Override
+            public void onConnectionError(String error) {
+                Log.e("MainActivity", "Ошибка подключения: " + error);
+                runOnUiThread(() ->
+                        Toast.makeText(MainActivity.this,
+                                "Ошибка realtime подключения",
+                                Toast.LENGTH_SHORT).show()
+                );
+            }
+        });
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (realtimeSubscription != null) {
+            realtimeSubscription.stopListening();
+        }
+    }
     private void startLocationUpdates() {
         geolocationManager.requestLocationUpdates();
     }
@@ -380,11 +416,4 @@ public class MainActivity extends BaseActivity {
         }
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (geolocationManager != null) {
-            geolocationManager.stopLocationUpdates();
-        }
-    }
 }

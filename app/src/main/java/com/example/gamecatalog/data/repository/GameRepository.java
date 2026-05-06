@@ -210,7 +210,6 @@ public class GameRepository {
 
                     if (response.isSuccessful()) {
                         try {
-                            // Проверяем, что ответ начинается с '['
                             if (responseBody.trim().startsWith("[")) {
                                 Gson gson = new Gson();
                                 Type type = new TypeToken<List<GameEntity>>(){}.getType();

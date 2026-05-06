@@ -315,6 +315,45 @@ case 'favorites':
         echo json_encode(['success' => true, 'deleted' => $stmt->rowCount()]);
     }
     break;
+    case 'subscribe':
+        header('Content-Type: text/event-stream');
+        header('Cache-Control: no-cache');
+        header('Access-Control-Allow-Origin: *');
+        header('X-Accel-Buffering: no'); // Отключаем буферизацию nginx
+
+        // Отключаем буферизацию вывода
+        ob_end_clean();
+        ini_set('output_buffering', 'off');
+
+        // Подписываемся на уведомления PostgreSQL
+        $pdo->exec("LISTEN game_changes;");
+
+        echo "retry: 1000\n\n";
+
+        while (true) {
+            // Ждём уведомления (1 секунда таймаут)
+            $result = $pdo->pgsqlGetNotify(PDO::FETCH_ASSOC, 1000);
+
+            if ($result) {
+                // Отправляем событие клиенту
+                echo "event: game_change\n";
+                echo "data: {$result['payload']}\n\n";
+            } else {
+                // Heartbeat каждые 5 секунд
+                if (time() % 5 == 0) {
+                    echo ": heartbeat\n\n";
+                }
+            }
+
+            ob_flush();
+            flush();
+
+            // Проверяем, не закрыл ли клиент соединение
+            if (connection_aborted()) {
+                break;
+            }
+        }
+        break;
     default:
         // Default response for root endpoint
         echo json_encode([
@@ -334,6 +373,5 @@ case 'favorites':
             ]
         ]);
 }
-
 $pdo = null;
 ?>
